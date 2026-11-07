@@ -48,3 +48,12 @@ The protected-write child produced the kernel diagnostic
 (trap 14 = page fault; error code 7 = page present, write access, user mode),
 and the parent continued. The parent's value was unchanged and a write after
 `munprotect` succeeded.
+
+## 7 November 2026 — checkpoint 4: kernel writes to protected buffers
+
+Same environment as checkpoint 3.
+
+| Step | Actual result |
+| --- | --- |
+| Added `read()`-into-protected-page test, before kernel fix | Guest panicked: `unexpected trap 14 from cpu 0 eip 80103743 (cr2=0x5000)`, `panic: trap` |
+| Added `argptrw()` / `checkuvmwrite()` and rebuilt | `vmtest` printed `ALL PASSED`; `read()`, `fstat()` and `pipe()` into protected pages returned `-1`, a read spanning a writable then protected page was rejected with neither page modified, and `write()` from a protected page printed `xy` |

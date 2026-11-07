@@ -96,21 +96,36 @@ checkpoint 5.
 allocated data page, with successful return values and correct read/write
 behavior. No unrelated kernel behavior changes.
 
-## Checkpoint 4: handle kernel writes to protected user buffers
+## Checkpoint 4: handle kernel writes to protected user buffers — complete
+
+Before the fix, `read()` from a pipe into a protected page panicked the guest
+kernel (`unexpected trap 14 ... panic: trap`), because xv6 sets `CR0.WP`.
+`sys_read`, `sys_fstat` and `sys_pipe` now use `argptrw()`, which adds
+`checkuvmwrite()` (every touched page present, user and writable) to the
+existing bounds check; they return `-1` instead. `copyout()` also refuses
+non-writable pages; its only callers (`exec`) target a fresh, writable stack.
+`write()` keeps using `argptr()`, so protected pages remain valid sources.
+
+**Guarantee and limitations.** After `mprotect`, neither user code nor these
+syscalls can modify the page. The check-then-write is safe because the target
+is one CPU, there are no threads and a process cannot change its own page
+table while it is inside another syscall; a multithreaded kernel would need to
+hold a lock or fault-handle instead. `exec()` replaces the whole address space
+and `sbrk()` shrink frees protected pages normally; new pages are writable.
 
 A user-mode write fault is only part of the behavior to verify. In this xv6
 base, some syscalls write directly to user buffers; an unchecked protected
 destination can fault in kernel mode. Other copy paths use a writable kernel
 alias of the physical page and can bypass user PTE write permission.
 
-- [ ] Audit `read()`, `fstat()` and `pipe()` output buffers and `copyout()`.
-- [ ] Validate writable user destinations before attempting the write. Invalid
+- [x] Audit `read()`, `fstat()` and `pipe()` output buffers and `copyout()`.
+- [x] Validate writable user destinations before attempting the write. Invalid
   or read-only output buffers should be rejected without a kernel panic.
-- [ ] Keep input-buffer checks separate: reading a protected page through
+- [x] Keep input-buffer checks separate: reading a protected page through
   `write()` must still be allowed.
-- [ ] Check ranges spanning more than one page, including a writable page
+- [x] Check ranges spanning more than one page, including a writable page
   followed by a protected page.
-- [ ] Document the exact protection guarantee and any remaining limitations.
+- [x] Document the exact protection guarantee and any remaining limitations.
 
 **Exit criterion:** protected destination buffers cannot crash the guest
 kernel or silently bypass the intended protection; readable buffers remain

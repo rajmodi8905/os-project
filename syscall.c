@@ -69,6 +69,16 @@ argptr(int n, char **pp, int size)
   return 0;
 }
 
+// Project addition: like argptr, but for a buffer the kernel will
+// write into. Also requires every page of the buffer to be writable.
+int
+argptrw(int n, char **pp, int size)
+{
+  if(argptr(n, pp, size) < 0)
+    return -1;
+  return checkuvmwrite(myproc()->pgdir, (uint)*pp, size);
+}
+
 // Fetch the nth word-sized system call argument as a string pointer.
 // Check that the pointer is valid and the string is nul-terminated.
 // (There is no shared writable memory, so the string can't change

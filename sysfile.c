@@ -73,7 +73,7 @@ sys_read(void)
   int n;
   char *p;
 
-  if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
+  if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptrw(1, &p, n) < 0)
     return -1;
   return fileread(f, p, n);
 }
@@ -109,7 +109,7 @@ sys_fstat(void)
   struct file *f;
   struct stat *st;
 
-  if(argfd(0, 0, &f) < 0 || argptr(1, (void*)&st, sizeof(*st)) < 0)
+  if(argfd(0, 0, &f) < 0 || argptrw(1, (void*)&st, sizeof(*st)) < 0)
     return -1;
   return filestat(f, st);
 }
@@ -426,7 +426,7 @@ sys_pipe(void)
   struct file *rf, *wf;
   int fd0, fd1;
 
-  if(argptr(0, (void*)&fd, 2*sizeof(fd[0])) < 0)
+  if(argptrw(0, (void*)&fd, 2*sizeof(fd[0])) < 0)
     return -1;
   if(pipealloc(&rf, &wf) < 0)
     return -1;

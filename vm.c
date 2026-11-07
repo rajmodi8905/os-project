@@ -352,6 +352,31 @@ setuvmwrite(pde_t *pgdir, uint sz, uint va, int npages, int writable)
   return 0;
 }
 
+// Project addition: return 0 if every page touched by the user range
+// [va, va+len) is a present, user, writable page in pgdir, else -1.
+// The caller has already checked that the range is inside the process.
+// Syscalls call this before the kernel stores into a user buffer, so a
+// read-only page is rejected instead of faulting in kernel mode (CR0.WP
+// is set) or being written through the kernel's own mapping.
+int
+checkuvmwrite(pde_t *pgdir, uint va, uint len)
+{
+  uint a, last;
+  pte_t *pte;
+
+  if(len == 0)
+    return 0;
+  last = PGROUNDDOWN(va + len - 1);
+  for(a = PGROUNDDOWN(va); ; a += PGSIZE){
+    pte = walkpgdir(pgdir, (void*)a, 0);
+    if(pte == 0 || (*pte & (PTE_P|PTE_U|PTE_W)) != (PTE_P|PTE_U|PTE_W))
+      return -1;
+    if(a == last)
+      break;
+  }
+  return 0;
+}
+
 // Given a parent process's page table, create a copy
 // of it for a child.
 pde_t*
@@ -415,6 +440,8 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
     va0 = (uint)PGROUNDDOWN(va);
     pa0 = uva2ka(pgdir, (char*)va0);
     if(pa0 == 0)
+      return -1;
+    if(checkuvmwrite(pgdir, va0, 1) < 0)   // project: honour PTE_W
       return -1;
     n = PGSIZE - (va - va0);
     if(n > len)

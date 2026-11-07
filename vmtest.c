@@ -82,10 +82,64 @@ basic(void)
   check(!childwritefaults(p, 'D'), "child write to unprotected page succeeds");
 }
 
+// Syscalls that write to user memory must not write to, or panic on,
+// a protected destination. Readable protected sources stay usable.
+static void
+kernelbuffers(void)
+{
+  char *p = allocpages(2);
+  int fds[2], fd, n;
+  struct stat st;
+
+  check(p != 0, "allocate two aligned pages");
+  p[0] = 'K';
+  p[PAGE] = 'L';
+  check(mprotect(p, 1) == 0, "protect first page for kernel-buffer tests");
+
+  // read() destination
+  check(pipe(fds) == 0, "create pipe");
+  check(write(fds[1], "xy", 2) == 2, "fill pipe");
+  check(read(fds[0], p, 2) == -1, "read() into protected page rejected");
+  check(p[0] == 'K', "protected page not modified by read()");
+  // a range that starts writable and runs into the protected page
+  check(munprotect(p, 1) == 0 && mprotect(p + PAGE, 1) == 0,
+        "switch protection to second page");
+  check(read(fds[0], p + PAGE - 1, 2) == -1,
+        "read() spanning writable then protected page rejected");
+  check(p[PAGE - 1] == 0 && p[PAGE] == 'L', "neither page modified");
+  check(read(fds[0], p, 2) == 2 && p[0] == 'x' && p[1] == 'y',
+        "read() into writable page still works");
+  close(fds[0]);
+  close(fds[1]);
+
+  // write() source: kernel only reads a protected page
+  check(mprotect(p, 1) == 0, "protect first page again");
+  fd = open("console", 1);
+  if(fd < 0)
+    fd = 1;
+  printf(1, "vmtest: protected bytes via write(): ");
+  n = write(fd, p, 2);
+  printf(1, "\n");
+  check(n == 2, "write() from protected page allowed");
+  if(fd != 1)
+    close(fd);
+
+  // fstat() and pipe() destinations
+  fd = open("vmtest", 0);
+  check(fd >= 0, "open vmtest for fstat");
+  check(fstat(fd, (struct stat*)p) == -1, "fstat() into protected page rejected");
+  check(fstat(fd, &st) == 0, "fstat() into writable buffer works");
+  close(fd);
+  check(pipe((int*)p) == -1, "pipe() into protected page rejected");
+  check(p[0] == 'x', "protected page unchanged");
+  check(munprotect(p, 2) == 0, "unprotect both pages");
+}
+
 int
 main(int argc, char *argv[])
 {
   basic();
+  kernelbuffers();
   if(failures == 0)
     printf(1, "vmtest: ALL PASSED\n");
   else
