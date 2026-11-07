@@ -2,6 +2,7 @@
 """Exercise the actual xv6 guest and retain its serial output; no dependencies."""
 import argparse
 import os
+import re
 from pathlib import Path
 import selectors
 import shutil
@@ -10,6 +11,29 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def run_vmtest(expect, send):
+    """Run the page-protection suite and correlate its faults with the kernel."""
+    send("vmtest")
+    start = len(transcript)
+    expect(b"$ ")   # returns whether vmtest finished or was killed
+    output = bytes(transcript[start:]).replace(b"\r", b"")
+    if b"vmtest: FAIL" in output or b"vmtest: ALL PASSED\n" not in output:
+        raise RuntimeError("vmtest reported a failure")
+    match = re.search(rb"vmtest: (\d+) child write faults observed", output)
+    diagnostics = re.findall(rb"pid \d+ vmtest: trap 14 err 7 ", output)
+    if not match or int(match.group(1)) != len(diagnostics) or not diagnostics:
+        raise RuntimeError(f"vmtest saw {match and match.group(1)} faults but the "
+                           f"kernel printed {len(diagnostics)} write-fault diagnostics")
+    send("echo XV6_SHELL_ALIVE_AFTER_VMTEST")
+    expect(b"\nXV6_SHELL_ALIVE_AFTER_VMTEST\n")
+    expect(b"$ ")
+    print(f"PASS: vmtest page protection ({len(diagnostics)} expected user write faults, "
+          "shell still alive)")
+
+
+transcript = bytearray()
 
 
 def main():
@@ -50,6 +74,7 @@ def main():
                     if not chunk:
                         raise RuntimeError("QEMU stopped before the expected response")
                     log.write(chunk)
+                    transcript.extend(chunk)
                     log.flush()
                     pending.extend(chunk.replace(b"\r", b""))
                     if b"panic:" in pending:
@@ -71,6 +96,7 @@ def main():
             expect(b"fork test OK\n")
             expect(b"$ ")
             print("PASS: xv6 boot, shell command and upstream forktest")
+            run_vmtest(expect, send)
             if args.full:
                 send("usertests")
                 expect(b"ALL TESTS PASSED\n")

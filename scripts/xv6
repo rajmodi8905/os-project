@@ -6,7 +6,7 @@ action="${1:-help}"
 case "$action" in
   help|-h|--help)
     echo "Usage: ./scripts/xv6 {doctor|build|run|smoke|check|clean}"
-    echo "smoke checks boot/shell/fork; check also runs upstream usertests."
+    echo "smoke checks boot/shell/fork and vmtest; check also runs upstream usertests."
     exit 0 ;;
   doctor|build|run|smoke|check|clean) ;;
   *) echo "Unknown command: $action" >&2; exit 2 ;;

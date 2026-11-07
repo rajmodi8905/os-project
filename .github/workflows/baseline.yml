@@ -1,4 +1,4 @@
-name: xv6 baseline
+name: xv6 baseline and page protection
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
           sudo apt-get install -y gcc-multilib binutils qemu-system-x86 python3 perl
       - name: Inspect toolchain
         run: ./scripts/xv6 doctor
-      - name: Build and run baseline regression tests
+      - name: Build and run vmtest and upstream regression tests
         run: ./scripts/xv6 check
       - name: Upload guest serial log
         if: always()

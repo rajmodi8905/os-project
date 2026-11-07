@@ -131,7 +131,15 @@ alias of the physical page and can bypass user PTE write permission.
 kernel or silently bypass the intended protection; readable buffers remain
 usable. No general syscall or memory-management redesign is needed.
 
-## Checkpoint 5: build a focused correctness suite
+## Checkpoint 5: build a focused correctness suite — complete locally
+
+`vmtest.c` implements every row below plus an immediate-effect row: a child
+writes a page (caching a writable translation), protects it and writes again
+with no context switch; this fails if the CR3 reload in `setuvmwrite()` is
+removed. `scripts/smoke.py` now runs `vmtest` in both `smoke` and `check`,
+fails on any `FAIL` line or if vmtest is killed, requires its count of faulting
+children to equal the kernel's `trap 14 err 7` diagnostics, and confirms the
+shell still answers. Linux CI must be confirmed from the actual workflow run.
 
 Add a user test program, tentatively `vmtest.c`, and register it in `UPROGS`.
 Allocate extra heap space and align a full data page; do not accidentally
@@ -169,8 +177,7 @@ filesystem and the existing upstream regression suite:
 ```
 
 Cleaning deletes the guest filesystem, so preserve needed guest data first.
-Run only one guest at a time. The existing `check` command currently tests the
-baseline; it must not be described as a protection test until extended.
+Run only one guest at a time. `smoke` and `check` now include `vmtest`.
 
 **Exit criterion:** feature tests and upstream regression tests pass locally
 and in Linux CI, with serial logs retained and any failures explained.

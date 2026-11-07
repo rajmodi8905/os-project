@@ -57,3 +57,29 @@ Same environment as checkpoint 3.
 | --- | --- |
 | Added `read()`-into-protected-page test, before kernel fix | Guest panicked: `unexpected trap 14 from cpu 0 eip 80103743 (cr2=0x5000)`, `panic: trap` |
 | Added `argptrw()` / `checkuvmwrite()` and rebuilt | `vmtest` printed `ALL PASSED`; `read()`, `fstat()` and `pipe()` into protected pages returned `-1`, a read spanning a writable then protected page was rejected with neither page modified, and `write()` from a protected page printed `xy` |
+
+## 7 November 2026 — checkpoint 5: correctness suite
+
+Same environment as checkpoint 3. `vmtest` contains 66 checks: basic
+protect/read/unprotect, immediate effect (TLB refresh), repeated calls, a
+three-page range with untouched neighbours, fork inheritance and independence
+in both directions, invalid arguments (unaligned, zero, negative, overflowing,
+wrapping, past heap end, kernel, stack guard page), atomic rejection of mixed
+ranges for both calls, and the checkpoint 4 kernel-buffer cases.
+
+| Command | Actual result |
+| --- | --- |
+| `./scripts/xv6 clean` then `./scripts/xv6 check` | `PASS` boot/forktest; `PASS: vmtest page protection (10 expected user write faults, shell still alive)`; `PASS: upstream usertests` |
+| `python3 -m py_compile scripts/smoke.py`, `bash -n scripts/xv6` | Passed |
+
+Mutation checks (temporary edits to `vm.c`, reverted afterwards), run with
+`./scripts/xv6 smoke`:
+
+| Mutation | Actual result |
+| --- | --- |
+| Remove the `lcr3()` TLB refresh | Runner `FAIL`; `vmtest: FAIL mprotect takes effect immediately (TLB refreshed)` |
+| Change PTEs during the validation pass (no separate pass) | Runner `FAIL`; the rejected guard-page range left the preceding program page protected and the vmtest parent was killed |
+
+An earlier version of the suite did not detect the missing TLB refresh because
+every protected write happened in a newly forked child, whose context switch
+reloads CR3. The immediate-effect test was added for that reason.
