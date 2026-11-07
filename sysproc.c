@@ -89,3 +89,29 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// Project addition: page-granular write protection.
+// mprotect(addr, len) clears write permission on len pages starting
+// at the page-aligned address addr; munprotect restores it.
+static int
+changeprotection(int writable)
+{
+  int addr, len;
+  struct proc *curproc = myproc();
+
+  if(argint(0, &addr) < 0 || argint(1, &len) < 0)
+    return -1;
+  return setuvmwrite(curproc->pgdir, curproc->sz, (uint)addr, len, writable);
+}
+
+int
+sys_mprotect(void)
+{
+  return changeprotection(0);
+}
+
+int
+sys_munprotect(void)
+{
+  return changeprotection(1);
+}

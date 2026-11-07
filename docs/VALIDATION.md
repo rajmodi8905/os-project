@@ -31,3 +31,20 @@ wrapper was corrected before publication and the smoke command was rerun.
 
 The spare Pop!_OS machine has not been tested. Remote CI results are reported
 by the actual workflow run, not inferred from the successful local build.
+
+## 7 November 2026 — checkpoint 3: syscalls and minimal test
+
+Validated in a Linux x86-64 cloud container (Ubuntu 24.04, host GCC 13.3.0
+with `-m32`, QEMU from Ubuntu `qemu-system-x86`), one emulated CPU.
+
+| Command | Actual result |
+| --- | --- |
+| `./scripts/xv6 smoke` (before changes) | Baseline boot, shell and forktest passed in this environment |
+| `make TOOLPREFIX= xv6.img fs.img` | Kernel and `_vmtest` built with `-Werror` |
+| `vmtest` typed at the guest shell | All 9 basic checks printed `ok`, then `vmtest: ALL PASSED` |
+
+The protected-write child produced the kernel diagnostic
+`pid 4 vmtest: trap 14 err 7 on cpu 0 eip 0x1fb addr 0x3000--kill proc`
+(trap 14 = page fault; error code 7 = page present, write access, user mode),
+and the parent continued. The parent's value was unchanged and a write after
+`munprotect` succeeded.

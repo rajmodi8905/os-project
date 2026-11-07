@@ -3,8 +3,8 @@
 An individual operating-systems course project: **Read-Only Page Protection in xv6**,
 based on the [OSTEP virtual-memory project, read-only section](https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/vm-xv6-intro#read-only-code).
 
-**Current stage: baseline setup.** The proposed `mprotect()` and `munprotect()`
-system calls are not implemented. Professor suitability confirmation has not yet
+**Current stage: implementation in progress.** `mprotect()` and `munprotect()`
+are implemented (checkpoint 3); see plan.md for remaining checkpoints. Professor suitability confirmation has not yet
 been recorded.
 
 ## Build and run

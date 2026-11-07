@@ -310,6 +310,48 @@ clearpteu(pde_t *pgdir, char *uva)
   *pte &= ~PTE_U;
 }
 
+// Project addition: set (writable != 0) or clear (writable == 0)
+// PTE_W on npages user pages starting at va in pgdir, the page table
+// of the current process whose user memory is [0, sz).
+// The whole range is validated before any PTE changes, so a failed
+// call leaves every permission as it was. Only PTE_W is modified.
+// Returns 0 on success, -1 on an invalid request.
+int
+setuvmwrite(pde_t *pgdir, uint sz, uint va, int npages, int writable)
+{
+  uint a, end;
+  pte_t *pte;
+
+  if(va % PGSIZE != 0 || npages <= 0 || va >= sz)
+    return -1;
+  // Compare page counts instead of computing va + npages*PGSIZE first,
+  // so a large npages cannot overflow past the check.
+  if((uint)npages > (sz - va) / PGSIZE)
+    return -1;
+  end = va + (uint)npages * PGSIZE;
+
+  // Pass 1: every page must already be a present user page.
+  // The stack guard page has PTE_U cleared and is rejected here.
+  for(a = va; a < end; a += PGSIZE){
+    pte = walkpgdir(pgdir, (void*)a, 0);  // never allocates
+    if(pte == 0 || (*pte & PTE_P) == 0 || (*pte & PTE_U) == 0)
+      return -1;
+  }
+
+  // Pass 2: change only the write bit.
+  for(a = va; a < end; a += PGSIZE){
+    pte = walkpgdir(pgdir, (void*)a, 0);
+    if(writable)
+      *pte |= PTE_W;
+    else
+      *pte &= ~PTE_W;
+  }
+
+  // Reloading CR3 flushes this CPU's cached (TLB) translations.
+  lcr3(V2P(pgdir));
+  return 0;
+}
+
 // Given a parent process's page table, create a copy
 // of it for a child.
 pde_t*

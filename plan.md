@@ -9,8 +9,9 @@ pages, keep reading them, and restore write permission later.
 
 The baseline setup is complete at commit `49798d1`: build/run helpers, local
 boot and regression checks, and a successful Linux CI run are available.
-See [baseline evidence](docs/VALIDATION.md). The protection syscalls and their
-feature tests are **not implemented yet**. Professor suitability confirmation
+See [baseline evidence](docs/VALIDATION.md). Checkpoint 3 (both syscalls and a
+minimal `vmtest`) is implemented; see the dated entries in
+[validation](docs/VALIDATION.md) for what has actually been run. Professor suitability confirmation
 and the exact submission deadline remain unverified.
 
 This plan describes future work; publishing it does not mark those steps done.
@@ -66,21 +67,26 @@ where write permission is checked, and why changing a PTE may require a TLB
 refresh. The mathematics needed is page number = address / 4096 and page
 offset = address % 4096, plus alignment and overflow checks.
 
-## Checkpoint 3: implement both syscalls with one permission helper
+## Checkpoint 3: implement both syscalls with one permission helper — complete
 
-- [ ] Add unused syscall numbers, dispatch entries, wrappers, user prototypes
+Implemented as `setuvmwrite()` in `vm.c`, wired through `sys_mprotect` /
+`sys_munprotect` in `sysproc.c` (syscall numbers 22 and 23). `copyuvm()` already
+copies `PTE_FLAGS`, so no change was needed for fork; this is tested in
+checkpoint 5.
+
+- [x] Add unused syscall numbers, dispatch entries, wrappers, user prototypes
   and assembly stubs following an existing syscall.
-- [ ] Implement a shared VM helper taking the range and desired write state.
-- [ ] Validate alignment, positive length and multiplication/addition overflow
+- [x] Implement a shared VM helper taking the range and desired write state.
+- [x] Validate alignment, positive length and multiplication/addition overflow
   before deriving the end address.
-- [ ] Require the full page span to be within the process's user bounds.
-- [ ] Walk every requested PTE without allocating missing page tables. Reject
+- [x] Require the full page span to be within the process's user bounds.
+- [x] Walk every requested PTE without allocating missing page tables. Reject
   absent mappings, non-user pages, guard pages and kernel addresses.
-- [ ] Use a validation pass followed by an update pass so a bad later page
+- [x] Use a validation pass followed by an update pass so a bad later page
   cannot leave earlier pages partially protected or unprotected.
-- [ ] Clear or set only `PTE_W`, then refresh translations using the x86
+- [x] Clear or set only `PTE_W`, then refresh translations using the x86
   mechanism described in the specification.
-- [ ] Verify existing `copyuvm()` preserves the flags; change it only if an
+- [x] Verify existing `copyuvm()` preserves the flags; change it only if an
   actual failing test shows that an adjustment is needed.
 
 **Likely files:** `vm.c`, `defs.h`, `sysproc.c`, `syscall.c`, `syscall.h`,
