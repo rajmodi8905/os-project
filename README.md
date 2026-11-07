@@ -36,7 +36,7 @@ files created inside the guest. Save any needed guest data before cleaning.
 
 `len` is a count of pages, not bytes. Null-pointer detection and changing the
 user-program load address are outside this reduced scope.
-See [docs/PLAN.md](docs/PLAN.md) for milestones and the intended demonstration.
+See [plan.md](plan.md) for implementation checkpoints, tests and the live demo.
 
 ## Source and attribution
 

@@ -3,7 +3,7 @@
 - Read the parent OS `context.md` and the shared user context before local work.
   Keep private continuation notes in ignored `context.md`; never publish local
   account notes, unrelated coursework, lecture PDFs, or email drafts.
-- Scope: read-only page protection in x86 xv6, following `docs/PLAN.md` and the
+- Scope: read-only page protection in x86 xv6, following `plan.md` and the
   OSTEP specification. Null-page protection is outside the selected scope.
 - Current authorization is basic setup. Do not silently implement later
   milestones while the user is reviewing or studying this checkpoint.
