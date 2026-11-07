@@ -3,9 +3,10 @@
 An individual operating-systems course project: **Read-Only Page Protection in xv6**,
 based on the [OSTEP virtual-memory project, read-only section](https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/vm-xv6-intro#read-only-code).
 
-**Current stage: implementation in progress.** `mprotect()` and `munprotect()`
-are implemented (checkpoint 3); see plan.md for remaining checkpoints. Professor suitability confirmation has not yet
-been recorded.
+**Current stage: feature implemented, demo prepared.** `mprotect()` and
+`munprotect()` are implemented and tested by `vmtest`; `vmdemo` is the live
+demonstration. Rehearsal and submission remain (see plan.md). Professor
+suitability confirmation has not yet been recorded.
 
 ## Build and run
 
@@ -18,9 +19,11 @@ Install the dependencies in [docs/SETUP.md](docs/SETUP.md), then run:
 ./scripts/xv6 run
 ```
 
-Inside the xv6 shell, try `ls`, `echo hello`, or `forktest`.
+Inside the xv6 shell, try `vmdemo`, `vmdemo 7 3`, `vmtest`, `ls` or `forktest`.
+[docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) explains the implementation and demo.
 Exit interactive QEMU with **Ctrl-A, then X**.
-`./scripts/xv6 check` also runs upstream `usertests` and saves the serial log in
+`./scripts/xv6 smoke` runs boot, `forktest` and `vmtest`; `./scripts/xv6 check`
+also runs upstream `usertests` and saves the serial log in
 `artifacts/`. Run only one guest at a time: they use the same project disk images.
 `./scripts/xv6 clean` removes generated xv6 binaries and disk images, including
 files created inside the guest. Save any needed guest data before cleaning.
@@ -51,5 +54,7 @@ Setup changes retain GNU C99 and make narrow compiler-warning accommodations
 for legacy BIOS mapping code and the recursive shell executor; these do not
 implement page protection. Details are in [docs/SETUP.md](docs/SETUP.md).
 
-An AI assistant helped prepare repository setup, scripts and documentation.
-Feature implementation and experimental results will be recorded as they occur.
+An AI assistant helped prepare repository setup, scripts and documentation,
+and drafted the checkpoint 3–6 implementation (`vm.c`, `sysproc.c`,
+`syscall.c`, `sysfile.c` changes, `vmtest.c`, `vmdemo.c`, runner and docs).
+Experimental results are recorded in [docs/VALIDATION.md](docs/VALIDATION.md).

@@ -83,3 +83,16 @@ Mutation checks (temporary edits to `vm.c`, reverted afterwards), run with
 An earlier version of the suite did not detect the missing TLB refresh because
 every protected write happened in a newly forked child, whose context switch
 reloads CR3. The immediate-effect test was added for that reason.
+
+## 7 November 2026 — checkpoint 6: demonstration materials
+
+Same environment as checkpoint 3.
+
+| Command | Actual result |
+| --- | --- |
+| `vmdemo`, `vmdemo 7 3`, `echo alive` at the guest shell | Both runs showed protected reads, child writes `STOPPED by page fault` (each with a `trap 14 err 7` kernel line), rejected requests returning `-1`, and a successful write after `munprotect`; the shell answered `alive` |
+| `./scripts/xv6 clean` then `./scripts/xv6 check` | All three `PASS` lines (boot/forktest, vmtest with 10 faults, upstream usertests) |
+| `git diff --check` | No whitespace errors |
+
+Not yet done: a GitHub Actions run of these commits, the Pop!_OS machine check,
+rehearsal on the presentation machine, and the submission.

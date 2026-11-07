@@ -10,7 +10,9 @@ pages, keep reading them, and restore write permission later.
 The baseline setup is complete at commit `49798d1`: build/run helpers, local
 boot and regression checks, and a successful Linux CI run are available.
 See [baseline evidence](docs/VALIDATION.md). Checkpoint 3 (both syscalls and a
-minimal `vmtest`) is implemented; see the dated entries in
+minimal `vmtest`), checkpoint 4 (kernel output buffers), checkpoint 5 (the
+correctness suite) and the checkpoint 6 demo materials are implemented; see the
+dated entries in
 [validation](docs/VALIDATION.md) for what has actually been run. Professor suitability confirmation
 and the exact submission deadline remain unverified.
 
@@ -182,16 +184,22 @@ Run only one guest at a time. `smoke` and `check` now include `vmtest`.
 **Exit criterion:** feature tests and upstream regression tests pass locally
 and in Linux CI, with serial logs retained and any failures explained.
 
-## Checkpoint 6: prepare the live demonstration and submission
+## Checkpoint 6: prepare the live demonstration and submission — materials ready
 
-- [ ] Prepare a short terminal demo, tentatively `vmdemo.c`, showing a writable
+`vmdemo [value] [pages]` and [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) (path
+diagram, code map, explanations) are in place. Rehearsal on the presentation
+machine, the submission itself and the in-person explanation remain for the
+student. Checkpoint 2 study items stay unticked: they record the student's own
+understanding, which documentation cannot complete on their behalf.
+
+- [x] Prepare a short terminal demo, tentatively `vmdemo.c`, showing a writable
   control, protected read, faulting child write and restored write.
-- [ ] Show fork inheritance and one rejected range; keep the shell usable.
-- [ ] Let the examiner choose a value or page count to vary the demonstration.
-- [ ] Draw the virtual address → PTE → permission check → fault-handler path.
-- [ ] Walk through the syscall wiring, shared helper, validation passes, TLB
+- [x] Show fork inheritance and one rejected range; keep the shell usable.
+- [x] Let the examiner choose a value or page count to vary the demonstration.
+- [x] Draw the virtual address → PTE → permission check → fault-handler path.
+- [x] Walk through the syscall wiring, shared helper, validation passes, TLB
   refresh and tests. Explain existing xv6 behavior versus project additions.
-- [ ] Explain why the CPU terminates the offending process, why a parent stays
+- [x] Explain why the CPU terminates the offending process, why a parent stays
   alive, why fork preserves flags and why cached permissions must be refreshed.
 - [ ] Rehearse on the actual presentation machine with dependencies installed.
 - [ ] Submit source, exact run instructions, test evidence and a short report
