@@ -14,3 +14,10 @@ kernel
 kernelmemfs
 mkfs
 .gdbinit
+
+# Project-generated evidence and private continuation notes.
+/artifacts/
+/context.md
+.DS_Store
+__pycache__/
+*.pyc

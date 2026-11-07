@@ -1,0 +1,31 @@
+name: xv6 baseline
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install x86 build and emulation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib binutils qemu-system-x86 python3 perl
+      - name: Inspect toolchain
+        run: ./scripts/xv6 doctor
+      - name: Build and run baseline regression tests
+        run: ./scripts/xv6 check
+      - name: Upload guest serial log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xv6-serial-log
+          path: artifacts/*.log
+          if-no-files-found: ignore

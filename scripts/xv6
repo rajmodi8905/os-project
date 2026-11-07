@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+action="${1:-help}"
+case "$action" in
+  help|-h|--help)
+    echo "Usage: ./scripts/xv6 {doctor|build|run|smoke|check|clean}"
+    echo "smoke checks boot/shell/fork; check also runs upstream usertests."
+    exit 0 ;;
+  doctor|build|run|smoke|check|clean) ;;
+  *) echo "Unknown command: $action" >&2; exit 2 ;;
+esac
+
+if [[ -z "${TOOLPREFIX+x}" ]]; then
+  for prefix in i686-elf- i386-elf- i386-jos-elf- x86_64-elf-; do
+    if command -v "${prefix}gcc" >/dev/null; then
+      TOOLPREFIX="$prefix"
+      break
+    fi
+  done
+  if [[ -z "${TOOLPREFIX+x}" ]]; then
+    case "$(uname -s):$(uname -m)" in
+      Linux:x86_64|Linux:i?86) TOOLPREFIX="" ;;
+      *) echo "Missing x86 ELF cross-compiler. See docs/SETUP.md." >&2; exit 1 ;;
+    esac
+  fi
+fi
+
+if [[ -z "${QEMU:-}" ]]; then
+  for candidate in qemu-system-i386 qemu-system-x86_64; do
+    if command -v "$candidate" >/dev/null; then QEMU="$candidate"; break; fi
+  done
+fi
+for tool in make gcc perl "${TOOLPREFIX}gcc" "${TOOLPREFIX}ld" "${TOOLPREFIX}objdump" "${TOOLPREFIX}objcopy"; do
+  command -v "$tool" >/dev/null || { echo "Missing tool: $tool" >&2; exit 1; }
+done
+
+if [[ "$action" == doctor ]]; then
+  echo "Host: $(uname -s) $(uname -m)"
+  "${TOOLPREFIX}gcc" --version | head -n 1
+  "${TOOLPREFIX}ld" --version | head -n 1
+  printf 'int xv6_probe;\n' | "${TOOLPREFIX}gcc" -m32 -ffreestanding -x c -c -o /dev/null -
+  command -v "${QEMU:-qemu-system-i386}" >/dev/null || { echo "QEMU missing. See docs/SETUP.md." >&2; exit 1; }
+  "$QEMU" --version | head -n 1
+  python3 --version
+  echo "Toolchain check passed. Build and smoke test still required."
+  exit 0
+fi
+
+if [[ "$action" == clean ]]; then
+  exec make TOOLPREFIX="$TOOLPREFIX" clean
+fi
+make -j"${JOBS:-4}" TOOLPREFIX="$TOOLPREFIX" CPUS=1 fs.img xv6.img
+case "$action" in
+  build) ;;
+  run)
+    command -v "${QEMU:-qemu-system-i386}" >/dev/null || { echo "QEMU missing." >&2; exit 1; }
+    echo "Exit QEMU: Ctrl-A, then X. Guest disks are fs.img and xv6.img."
+    exec make TOOLPREFIX="$TOOLPREFIX" QEMU="$QEMU" CPUS=1 QEMUEXTRA="-nic none" qemu-nox ;;
+  smoke|check)
+    if [[ "$action" == check ]]; then
+      exec python3 scripts/smoke.py --qemu "${QEMU:-qemu-system-i386}" --full
+    fi
+    exec python3 scripts/smoke.py --qemu "${QEMU:-qemu-system-i386}" ;;
+esac

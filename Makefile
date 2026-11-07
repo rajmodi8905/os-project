@@ -76,7 +76,7 @@ AS = $(TOOLPREFIX)gas
 LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
-CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer
+CFLAGS = -std=gnu99 -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 ASFLAGS = -m32 -gdwarf-2 -Wa,-divide
 # FreeBSD ld wants ``elf_i386_fbsd''
@@ -284,3 +284,11 @@ tar:
 	(cd /tmp; tar cf - xv6) | gzip >xv6-rev10.tar.gz  # the next one will be 10 (9/17)
 
 .PHONY: dist-test dist
+
+# Compatibility for the original xv6 code with recent GCC releases.
+# mp.c intentionally addresses BIOS memory through the kernel's high mapping.
+mp.o: CFLAGS += -Wno-array-bounds
+# The shell's command executor intentionally recurses; its children exit.
+sh.o: CFLAGS += $(shell $(CC) -Werror=infinite-recursion -x c -c /dev/null -o /dev/null >/dev/null 2>&1 && echo -Wno-infinite-recursion)
+# GCC 16 diagnoses a bookkeeping counter in the unchanged upstream tests.
+usertests.o: CFLAGS += -Wno-unused-but-set-variable
