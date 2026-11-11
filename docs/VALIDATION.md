@@ -94,5 +94,35 @@ Same environment as checkpoint 3.
 | `./scripts/xv6 clean` then `./scripts/xv6 check` | All three `PASS` lines (boot/forktest, vmtest with 10 faults, upstream usertests) |
 | `git diff --check` | No whitespace errors |
 
-Not yet done: a GitHub Actions run of these commits, the Pop!_OS machine check,
-rehearsal on the presentation machine, and the submission.
+Not yet done at the time: a GitHub Actions run of these commits, the Pop!_OS
+machine check, rehearsal on the presentation machine, and the submission.
+
+## 7 November 2026 — Linux CI for checkpoints 3–6
+
+GitHub Actions workflow "xv6 baseline and page protection", run 4 on commit
+`2c04dd5` (Ubuntu 22.04 runner, `./scripts/xv6 check`): conclusion `success`.
+https://github.com/rajmodi8905/os-project/actions/runs/42400973719
+
+## 11 November 2026 — Pop!_OS laptop
+
+Run by a Claude Code session on the laptop itself (via Remote Control), as a
+normal user, one guest at a time, on a fresh clone of
+`claude/hopeful-hamilton-x2oed7` at `2c04dd5` with no local changes. Results
+below are as reported by that session.
+
+Machine: x86_64, Pop!_OS 24.04 LTS, Intel Core Ultra 7 165H. Toolchain from
+`./scripts/xv6 doctor`: GCC 13.3.0, GNU ld 2.42, QEMU 8.2.2, Python 3.12.3,
+"Toolchain check passed." `gcc-multilib` was not installed and was not needed.
+
+| Command | Actual result |
+| --- | --- |
+| `./scripts/xv6 clean` then `./scripts/xv6 check` | `PASS: xv6 boot, shell command and upstream forktest`; `PASS: vmtest page protection (10 expected user write faults, shell still alive)`; `PASS: upstream usertests` |
+
+The build printed linker warnings only (missing `.note.GNU-stack` in `usys.o`
+and `entryother`, and an RWX LOAD segment in user programs such as
+`_vmdemo`). These come from xv6's legacy assembly and simple user-program
+linking with a modern binutils, also appear in the container build, and do
+not affect the guest. The serial log stayed local on the laptop
+(`artifacts/usertests.log`).
+
+Remaining: rehearsal on the presentation machine and the submission.

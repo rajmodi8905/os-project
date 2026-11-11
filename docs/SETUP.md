@@ -19,8 +19,10 @@ cd os-project
 ./scripts/xv6 run
 ```
 
-The native GCC/binutils toolchain is used on x86 Linux. The spare Pop!_OS
-machine has not yet been inspected or tested; check `uname -m` first.
+The native GCC/binutils toolchain is used on x86 Linux; check `uname -m` first.
+On the Pop!_OS 24.04 laptop the build and all checks passed without
+`gcc-multilib` installed (xv6 uses neither host headers nor the host C library);
+it remains in the list because the CI image installs it.
 
 ## macOS, including Apple Silicon
 

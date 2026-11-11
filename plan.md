@@ -48,8 +48,8 @@ demand paging, copy-on-write and threads are outside this project.
 - [x] Build and boot locally; run shell, `forktest` and upstream `usertests`.
 - [x] Publish the repository and verify the Linux baseline CI run.
 
-The spare Pop!_OS machine still needs a real setup/boot check. See
-[setup commands](docs/SETUP.md). Run QEMU as an ordinary user with project disk
+The Pop!_OS laptop passed a fresh-clone `clean` + `check` on 11 November 2026
+(see [validation](docs/VALIDATION.md)). See [setup commands](docs/SETUP.md). Run QEMU as an ordinary user with project disk
 images; leave host disks, kernel and boot configuration alone.
 
 ## Checkpoint 2: understand the code before changing it
@@ -141,7 +141,8 @@ with no context switch; this fails if the CR3 reload in `setuvmwrite()` is
 removed. `scripts/smoke.py` now runs `vmtest` in both `smoke` and `check`,
 fails on any `FAIL` line or if vmtest is killed, requires its count of faulting
 children to equal the kernel's `trap 14 err 7` diagnostics, and confirms the
-shell still answers. Linux CI must be confirmed from the actual workflow run.
+shell still answers. Linux CI run 4 (commit `2c04dd5`) succeeded, and the same `check` passed on
+the Pop!_OS laptop.
 
 Add a user test program, tentatively `vmtest.c`, and register it in `UPROGS`.
 Allocate extra heap space and align a full data page; do not accidentally
