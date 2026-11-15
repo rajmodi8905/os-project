@@ -12,14 +12,15 @@ coursework, email drafts) never belong in this repository.
 - **Status:** the feature, tests, demo program and documentation are complete
   and pass on three Linux platforms (see below). macOS was validated for the
   baseline only; the feature has not yet been run on the Mac.
-- **Branch:** all project work is on `claude/hopeful-hamilton-x2oed7`. It has
-  **not** been merged into `main` yet.
+- **Branch:** `main` is the up-to-date branch; study and demo from it. The
+  working branch `claude/hopeful-hamilton-x2oed7` was fast-forwarded into
+  `main` on 15 November 2026, so the commit hashes below are the same on both.
 - **Phase now:** the student is preparing for the demo and viva. The deadline
   is the end-semester exam date + 3 days. The professor allows AI help, but the
   student must own the code: explain any block, and modify it without AI.
 - **What remains (the student's work):** the `docs/VIVA.md` exercises done
   unaided, the question bank, rehearsal on the presentation machine
-  (`docs/DEMO.md`), the demo and the viva. Optionally, merge the branch into `main`.
+  (`docs/DEMO.md`), the demo and the viva.
 
 ## Guidance for an AI assistant helping from here
 
@@ -98,4 +99,4 @@ Key files: `vm.c` (`setuvmwrite`, `checkuvmwrite`, `copyout`), `sysproc.c`
 - **11 Nov 2026:** fresh-clone validation on the Pop!_OS laptop (run by an
   assistant session on the laptop).
 - **15 Nov 2026:** professor's requirements recorded; `DEMO.md`, `VIVA.md`
-  and this handover added.
+  and this handover added; all work fast-forwarded into `main`.

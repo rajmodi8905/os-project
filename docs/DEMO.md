@@ -13,7 +13,6 @@ sudo apt update
 sudo apt install build-essential binutils qemu-system-x86 python3 perl git
 git clone https://github.com/rajmodi8905/os-project.git
 cd os-project
-git checkout claude/hopeful-hamilton-x2oed7   # skip once merged into main
 ./scripts/xv6 doctor
 ```
 

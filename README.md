@@ -19,8 +19,7 @@ remains (see plan.md).
 - [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md): address → PTE → fault diagram and
   a map of existing xv6 code versus project additions.
 
-Until the work is merged into `main`, run
-`git checkout claude/hopeful-hamilton-x2oed7` after cloning.
+All work is on `main`; a plain `git clone` gives the complete project.
 
 ## Build and run
 
