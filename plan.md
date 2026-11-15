@@ -13,10 +13,18 @@ See [baseline evidence](docs/VALIDATION.md). Checkpoint 3 (both syscalls and a
 minimal `vmtest`), checkpoint 4 (kernel output buffers), checkpoint 5 (the
 correctness suite) and the checkpoint 6 demo materials are implemented; see the
 dated entries in
-[validation](docs/VALIDATION.md) for what has actually been run. Professor suitability confirmation
-and the exact submission deadline remain unverified.
+[validation](docs/VALIDATION.md) for what has actually been run. The professor has set the requirements
+below; the exact calendar date depends on the end-semester exam schedule.
 
 This plan describes future work; publishing it does not mark those steps done.
+
+## Professor's requirements (recorded 15 November 2026)
+
+- Demo and viva must be completed by the end-semester exam date + 3 days.
+- AI use is allowed, but the student must take complete ownership of the code:
+  explain any block correctly, and modify it to change its behaviour without AI
+  help. Preparation material: [docs/VIVA.md](docs/VIVA.md) and
+  [docs/DEMO.md](docs/DEMO.md).
 
 ## Scope and API
 
@@ -202,6 +210,9 @@ understanding, which documentation cannot complete on their behalf.
   refresh and tests. Explain existing xv6 behavior versus project additions.
 - [x] Explain why the CPU terminates the offending process, why a parent stays
   alive, why fork preserves flags and why cached permissions must be refreshed.
+- [x] Write the demo runbook ([docs/DEMO.md](docs/DEMO.md)) and viva guide
+  with exercises ([docs/VIVA.md](docs/VIVA.md)).
+- [ ] Complete VIVA.md exercises 1–3 unaided and answer its question bank.
 - [ ] Rehearse on the actual presentation machine with dependencies installed.
 - [ ] Submit source, exact run instructions, test evidence and a short report
   before the confirmed course deadline; explain the implementation in person.
@@ -216,6 +227,6 @@ Follow the checkpoints in order. After each meaningful step, record the changed
 files, decisions, exact commands, actual results and remaining work. Keep
 private continuation notes and generated logs out of the public commit.
 
-This is a planning/documentation checkpoint. The next implementation milestone
-begins when requested; professor suitability confirmation is still a separate
-course requirement. Do not silently expand the agreed project scope.
+Implementation checkpoints 3–6 are complete. What remains is the student's
+own study, rehearsal, the demo and the viva. Do not silently expand the agreed
+project scope.

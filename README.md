@@ -5,8 +5,20 @@ based on the [OSTEP virtual-memory project, read-only section](https://github.co
 
 **Current stage: feature implemented, demo prepared.** `mprotect()` and
 `munprotect()` are implemented and tested by `vmtest`; `vmdemo` is the live
-demonstration. Rehearsal and submission remain (see plan.md). Professor
-suitability confirmation has not yet been recorded.
+demonstration. The demo and viva are due by the end-semester exam date + 3 days; rehearsal
+remains (see plan.md).
+
+## Demo and viva
+
+- [docs/DEMO.md](docs/DEMO.md): setup, pre-flight check, the exact demo
+  script with talking points, and troubleshooting.
+- [docs/VIVA.md](docs/VIVA.md): block-by-block explanation of every project
+  change, a question bank, and modification exercises to practise without AI.
+- [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md): address → PTE → fault diagram and
+  a map of existing xv6 code versus project additions.
+
+Until the work is merged into `main`, run
+`git checkout claude/hopeful-hamilton-x2oed7` after cloning.
 
 ## Build and run
 
