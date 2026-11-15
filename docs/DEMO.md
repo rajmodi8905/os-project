@@ -19,10 +19,14 @@ git checkout claude/hopeful-hamilton-x2oed7   # skip once merged into main
 
 `gcc-multilib` is optional on Pop!_OS (the build worked without it).
 
-### macOS
+### macOS (Intel or Apple Silicon)
 
 Follow the macOS section of [SETUP.md](SETUP.md) (Homebrew `qemu` and
-`i686-elf-gcc`), then clone and run `./scripts/xv6 doctor` as above.
+`i686-elf-gcc`), then clone and run `./scripts/xv6 doctor` as above. On Apple
+Silicon, QEMU emulates the x86 CPU in software, so boot and `check` are slower
+but work. The Mac passed the baseline checks on 7 November; run section 2 on it
+once before relying on it for the demo, since the feature itself has so far
+been run on Linux only.
 
 ## 2. Pre-flight check (do this on the demo machine, the day before and again on the day)
 

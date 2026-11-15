@@ -1,12 +1,16 @@
 # os-project working instructions
 
+- Start with `docs/HANDOVER.md`: current state, decisions, what remains.
+
 - Read the parent OS `context.md` and the shared user context before local work.
   Keep private continuation notes in ignored `context.md`; never publish local
   account notes, unrelated coursework, lecture PDFs, or email drafts.
 - Scope: read-only page protection in x86 xv6, following `plan.md` and the
   OSTEP specification. Null-page protection is outside the selected scope.
-- Current authorization is basic setup. Do not silently implement later
-  milestones while the user is reviewing or studying this checkpoint.
+- Current phase: implementation is complete; the student is preparing for the
+  demo and viva and must own every line. Do not add or change features unless
+  explicitly asked; prefer explaining, quizzing and reviewing the student's
+  own edits.
 - Preserve upstream history, LICENSE and README. Record the pinned base and
   separate existing xv6 code from project contributions and future plans.
 - Run only inside QEMU using project image files, as a normal user. Never write
