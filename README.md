@@ -14,6 +14,8 @@ remains (see plan.md).
   script with talking points, and troubleshooting.
 - [docs/VIVA.md](docs/VIVA.md): block-by-block explanation of every project
   change, a question bank, and modification exercises to practise without AI.
+- [video/README.md](video/README.md): a ~26-minute narrated viva video (script,
+  slides and one-command render helper; render it on your laptop).
 - [docs/HANDOVER.md](docs/HANDOVER.md): current state and history for anyone
   (or any AI assistant) continuing the work.
 - [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md): address → PTE → fault diagram and
