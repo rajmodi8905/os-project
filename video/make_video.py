@@ -34,7 +34,9 @@ VOICE = os.environ.get("VOICE", "mb-us2")          # falls back to en-us if mbro
 SPEED = os.environ.get("SPEED", "150")
 GAP = 0.35                                          # seconds of silence after each sentence
 
-CHAPTERS = ["Problem", "Background", "Solution", "Tests & demo", "Modify it", "Viva Q&A"]
+LONG = "--long" in sys.argv
+CHAPTERS = ["Problem", "Background", "Solution", "Tests & demo", "Modify it", "Viva Q&A", "Live proof"]
+ORDER = [0, 1, 2, 3, 6, 4, 5] if LONG else [0, 1, 2, 3, 4, 5]   # chip order on screen
 steps = []
 
 # --------------------------------------------------------------------------- text to speech
@@ -66,7 +68,9 @@ def spoken(text):
     return " ".join(t.split())
 
 
-def S(ch, main, text=None, silence=None, say=None):
+def S(ch, main, text=None, silence=None, say=None, long=False):
+    if long and not LONG:
+        return
     steps.append(dict(ch=ch, main=main, text=text, silence=silence, say=say))
 
 
@@ -146,6 +150,7 @@ ul.bul code{font-family:'DejaVu Sans Mono',monospace;color:#ffa657;font-size:36p
 .title h1{font-size:86px;line-height:1.1}.title p{font-size:38px;color:#8b949e;margin:0}
 .agenda{display:flex;gap:18px;margin-top:20px}
 .agenda .box{font-size:28px;min-width:230px}
+.cap.small{font-size:29px;line-height:1.3;padding:0 100px}
 .big{font-size:44px}
 .eq{font-family:'DejaVu Sans Mono',monospace;font-size:38px;line-height:1.7}
 .eq b.r{color:#f85149}.eq b.g{color:#3fb950}.eq b.y{color:#ffa657}.eq b.b{color:#58a6ff}
@@ -173,15 +178,17 @@ def hl_line(path, text):
 
 
 def page(ch, main, caption, frac):
+    pos = ORDER.index(ch)
     chips = "".join(
-        f'<div class="chip {"on" if i == ch else "done" if i < ch else ""}">{html.escape(c)}</div>'
-        for i, c in enumerate(CHAPTERS))
+        f'<div class="chip {"on" if k == pos else "done" if k < pos else ""}">{html.escape(CHAPTERS[i])}</div>'
+        for k, i in enumerate(ORDER))
     cap = html.escape(caption) if caption else ""
+    capcls = "cap small" if len(caption or "") > 170 else "cap"
     return (f'<!doctype html><meta charset="utf-8"><style>{CSS}</style><body>'
             f'<div class="top"><div class="brand">Read-only page protection in <span>xv6</span></div>'
             f'<div class="chips">{chips}</div></div>'
             f'<div class="prog"><i style="width:{frac * 100:.2f}%"></i></div>'
-            f'<div class="main">{main}</div><div class="cap">{cap}</div></body>')
+            f'<div class="main">{main}</div><div class="{capcls}">{cap}</div></body>')
 
 
 def code_view(path, show, focus=None, ours=None, note="", head=None):
@@ -236,8 +243,8 @@ def chain(items):
 
 
 def term_view(lines, upto, hl=(), head="xv6 guest · QEMU serial console", note="", noteh="Look at"):
-    show = lines[max(0, upto - 24):upto]
-    base = max(0, upto - 24)
+    show = lines[max(0, upto - 21):upto]
+    base = max(0, upto - 21)
     out = []
     for i, l in enumerate(show):
         idx = base + i
@@ -260,7 +267,7 @@ def term_view(lines, upto, hl=(), head="xv6 guest · QEMU serial console", note=
 
 # --------------------------------------------------------------------------- content
 # ---- chapter 0: problem
-agenda = ["Problem", "Background", "Solution", "Tests & demo", "Modify it", "Viva Q&A"]
+agenda = [CHAPTERS[i] for i in ORDER]
 
 
 def title_card(lit):
@@ -273,6 +280,7 @@ def title_card(lit):
 S(0, title_card(0), "This video prepares you for the viva on read-only page protection in xv6.")
 S(0, title_card(3), "We go from the problem, through the background and our solution, to the code block by block, and then the tests and a live demo.")
 S(0, title_card(6), "At the end you get three example changes an examiner might ask for, and rapid-fire viva questions.")
+S(0, title_card(7), "This longer version also walks through every file we wrote, all the tests, the demo program and the runner, and ends with a step by step guide to proving it live in front of the examiner.", long=True)
 S(0, title_card(6), "Pause often, and try to rewrite each function yourself. You must own every line.")
 
 PROB = [
@@ -486,6 +494,28 @@ S(2, code_view("sysfile.c", (69, 82), (76, 76), ours=(76, 76), note="<p><code>ar
 S(2, code_view("vm.c", (433, 452), (441, 445), ours=(444, 445), note="<p><code>copyout</code> writes through the kernel's own always-writable alias, so it needed the same check.</p>", head="copyout"),
   "copyout writes through the kernel's own always-writable mapping, so it got the same check.")
 
+# ---- long only: the rest of the code we wrote (chapter 2)
+S(2, code_view("user.h", (14, 28), (26, 27), ours=(26, 27), note="<p>Prototypes so user programs can call the two new system calls.</p>", head="user.h"),
+  "Now the rest of the code we wrote, file by file. In user.h, two prototypes let user programs call mprotect and munprotect.", long=True)
+S(2, code_view("defs.h", (176, 190), (186, 187), ours=(186, 187), note="<p>Kernel-internal declarations. <code>argptrw</code> is declared at line 154.</p>", head="defs.h"),
+  "defs.h declares setuvmwrite and checkuvmwrite, and argptrw, so sysproc.c, syscall.c and sysfile.c can call them.", long=True)
+S(2, code_view("Makefile", (168, 187), (184, 185), ours=(184, 185), note="<p>Without these two lines the programs are not built or copied into the guest's disk, and the guest says <code>not found</code>.</p>", head="Makefile"),
+  "The Makefile lists vmtest and vmdemo as user programs, so they are compiled and copied into the guest's disk image. Forget this, and the guest says: not found.", long=True)
+S(2, code_view("vm.c", (35, 54), (41, 46), note="<p>Returns the address of the PTE for an address. With <code>alloc</code> = 0 it returns 0 instead of building a page table.</p>", head="walkpgdir (existing)"),
+  "Two existing pieces you must know. walkpgdir finds the directory entry, then the page table, and returns a pointer to the PTE. With alloc zero it gives up instead of building a page table, which both our helpers rely on.", long=True)
+S(2, code_view("exec.c", (62, 69), (68, 68), note="<p>The lower of the two new pages loses <code>PTE_U</code>: the <b>guard page</b>. Our validation rejects it.</p>", head="Guard page (existing)"),
+  "And exec allocates two pages and clears the user bit on the lower one. That is the guard page, and our validation rejects any page without the user bit.", long=True)
+RW = [
+    "Reject: unaligned, count ≤ 0, start ≥ <code>sz</code>",
+    "Reject: <code>npages</code> &gt; <code>(sz - va) / PGSIZE</code>",
+    "Pass 1: each page present, user (no allocating)",
+    "Pass 2: set or clear <b>only</b> <code>PTE_W</code>",
+    "<code>lcr3(V2P(pgdir))</code>, then return 0",
+]
+S(2, bullets("Rewrite setuvmwrite from memory", RW, 5, dim_prev=False),
+  "A good test of ownership: close the video and rewrite setuvmwrite from these five steps. Reject bad arguments. Compare counts. Validate every page. Change only the write bit. Then reload CR3.", long=True)
+
+
 # ---- chapter 3: tests and demo
 S(3, code_view("vmtest.c", (41, 60), (48, 58), ours=(1, 400), note="<p>A child does the risky write, so a fault kills the child, not the test.</p>", head="vmtest.c"),
   "To test this from user code, vmtest uses a child process, because a faulting write kills only its own process.")
@@ -497,6 +527,62 @@ S(3, code_view("vmtest.c", (92, 111), (101, 104), ours=(1, 400), note="<p>The fi
   "One test deserves special mention. The child writes the page first, caching a writable translation, then calls mprotect and writes again.")
 S(3, code_view("vmtest.c", (92, 111), (103, 104), ours=(1, 400), note="<p>No <code>lcr3</code> → the second write succeeds → the marker arrives → test fails. We deleted the line to prove it.</p>", head="Why it matters"),
   "Without the CR3 reload, that second write would succeed. We proved it by deleting the line: this test failed. Then we restored it.")
+
+TR = [
+    "<code>mprotect(p, 2)</code> declared in <code>user.h</code>",
+    "<code>usys.S</code> stub: <code>eax = 22</code>, <code>int T_SYSCALL</code>",
+    "<code>trap()</code> → <code>syscall()</code> looks up slot 22 in <code>syscall.c</code>",
+    "<code>sys_mprotect</code> → <code>changeprotection(0)</code> in <code>sysproc.c</code>",
+    "<code>setuvmwrite</code> in <code>vm.c</code>: validate, clear <code>PTE_W</code>, <code>lcr3</code>",
+    "Result returns in <code>eax</code> to the program",
+]
+for k in range(1, 7):
+    S(2, bullets("One mprotect call, end to end", TR, k),
+      ["A very likely question: walk me from mprotect in C to the page table entry, naming every file. In the program, mprotect is declared in user.h.",
+       "The stub in usys.S puts twenty-two in EAX and executes int T underscore SYSCALL.",
+       "The trap handler calls syscall, which looks up slot twenty-two in the table in syscall.c.",
+       "That slot is sys mprotect in sysproc.c, which calls change protection with writable equals zero.",
+       "Which calls setuvmwrite in vm.c: validate, clear the write bit, and reload CR3.",
+       "The result goes back in EAX, and that is what the program sees."][k - 1], long=True)
+
+# ---- long only: the full vmtest tour (chapter 3)
+V = (1, 400)
+S(3, code_view("vmtest.c", (1, 20), (8, 19), ours=V, note="<p><code>check</code> prints ok or FAIL and counts failures. <code>faults</code> counts children stopped by a fault.</p>", head="vmtest.c: the helpers"),
+  "Now vmtest.c from top to bottom. check prints ok or FAIL and counts failures. The faults counter counts children stopped by a fault, and the runner compares it with the kernel.", long=True)
+S(3, code_view("vmtest.c", (22, 40), (24, 33), ours=V, note="<p>Whole fresh pages: the tests never protect the stack or <code>malloc</code>'s own data.</p>", head="allocpages"),
+  "allocpages grows the heap with sbrk, rounds up to a page boundary, and returns whole fresh pages, so a test never protects the stack or malloc's own data.", long=True)
+S(3, code_view("vmtest.c", (125, 137), (131, 134), ours=V, note="<p>Calling a protection twice must be harmless and give the same state.</p>", head="repeated"),
+  "The repeated test calls mprotect twice, then munprotect twice. Doing the same thing again must be harmless.", long=True)
+S(3, code_view("vmtest.c", (141, 160), (148, 155), ours=V, note="<p>Pages 1–3 of 5 protected. Every page in the range must fault; pages 0 and 4 must stay writable.</p>", head="multiple"),
+  "The multiple test protects the middle three of five pages. Every page in the range must fault, while the page before and the page after stay writable.", long=True)
+S(3, code_view("vmtest.c", (163, 182), (169, 171), ours=V, note="<p>A forked child inherits the read-only page, so it faults.</p>", head="forking: inheritance"),
+  "The forking test first protects a page. A freshly forked child must fault when it writes, so protection is inherited.", long=True)
+S(3, code_view("vmtest.c", (172, 191), (176, 191), ours=V, note="<p>The child unprotects and writes <b>its own copy</b>; the parent's copy must be unchanged and still protected.</p>", head="forking: independence"),
+  "Then a child unprotects and writes its own copy, and reports back through a pipe. The parent checks that its copy is unchanged and still protected.", long=True)
+S(3, code_view("vmtest.c", (185, 204), (193, 202), ours=V, note="<p>And the reverse: a child protecting <b>its</b> copy must not protect the parent's.</p>", head="forking: the reverse"),
+  "And the reverse: a child that protects its copy must not protect the parent's. So the two are independent in both directions.", long=True)
+S(3, code_view("vmtest.c", (206, 225), (214, 224), ours=V, note="<p>Every bad request must return <code>-1</code>.</p>", head="invalid arguments"),
+  "The invalid test lists every bad request: unaligned, zero, negative, overflowing, wrapping, past the heap, a kernel address, and the guard page. Each must return minus one.", long=True)
+S(3, code_view("vmtest.c", (221, 240), (226, 239), ours=V, note="<p>A range that runs into an invalid page must fail <b>and leave earlier pages as they were</b>. This test caught our merged-passes mutation.</p>", head="atomic rejection"),
+  "Then the atomicity cases. A range that runs into an invalid page must fail, and the earlier pages must stay exactly as they were. A child write checks it after every rejection.", long=True)
+S(3, code_view("vmtest.c", (245, 264), (254, 260), ours=V, note="<p><code>read()</code> into a protected page must return <code>-1</code> and leave the page alone. Before our fix this panicked the kernel.</p>", head="kernel buffers: read"),
+  "The kernel buffer tests protect a page and ask read to fill it. Read must return minus one and leave the page alone. Before our fix, this exact test panicked the kernel.", long=True)
+S(3, code_view("vmtest.c", (262, 281), (264, 280), ours=V, note="<p>A buffer starting in a writable page and running into a protected one is also rejected. <code>write()</code> from a protected page still works.</p>", head="kernel buffers: spanning, write"),
+  "A buffer that starts in a writable page and runs into a protected one is also rejected, and neither page changes. And write from a protected page still works.", long=True)
+S(3, code_view("vmtest.c", (284, 303), (287, 291), ours=V, note="<p><code>fstat</code> and <code>pipe</code> destinations are checked the same way.</p>", head="kernel buffers: fstat, pipe"),
+  "The fstat and pipe destinations are rejected in the same way when the page is protected.", long=True)
+S(3, code_view("vmtest.c", (295, 311), (305, 309), ours=V, note="<p>The printed fault count is what the runner compares with the kernel's <code>trap 14</code> lines.</p>", head="main"),
+  "main runs the groups in order, prints how many faults it saw, and prints ALL PASSED only if no check failed. That printed count is what the runner compares with the kernel messages.", long=True)
+D = (1, 100)
+S(3, code_view("vmdemo.c", (21, 40), (28, 39), ours=D, note="<p>Same idea as the test helper, with friendly output.</p>", head="vmdemo.c: trywrite"),
+  "vmdemo is the friendly version of the same idea. trywrite forks a child that writes, and the parent prints whether the write succeeded or was stopped by a page fault.", long=True)
+S(3, code_view("vmdemo.c", (42, 61), (48, 56), ours=D, note="<p><code>vmdemo [value] [pages]</code>: the examiner can choose both. 1 to 16 pages.</p>", head="vmdemo.c: arguments"),
+  "main reads an optional value and page count, so the examiner can choose them, from one to sixteen pages.", long=True)
+S(3, code_view("vmdemo.c", (61, 80), (61, 71), ours=D, note="<p>Scene 1: writable control. Scene 2: protect, read still works, child write is stopped.</p>", head="vmdemo.c: scenes 1 and 2"),
+  "Scene one is the writable control. Scene two protects the pages, shows a protected read still works, and a child write must be stopped.", long=True)
+S(3, code_view("vmdemo.c", (73, 89), (73, 87), ours=D, note="<p>Scene 3: fork inheritance. Scene 4: bad requests change nothing. Scene 5: restore.</p>", head="vmdemo.c: scenes 3 to 5"),
+  "Scenes three to five: fork inheritance, invalid requests that change nothing, and munprotect followed by a successful write.", long=True)
+
 
 G = [l.rstrip("\n") for l in (ROOT / "video/assets/guest_output.txt").read_text().replace("\r", "").split("\n")]
 
@@ -535,6 +621,106 @@ MUT = ('<p>We also <b>broke the code on purpose</b>:</p><p>no <code>lcr3</code> 
 S(3, term_view(TL, len(TL), (4,), head="Laptop terminal", note=MUT, noteh="Mutation checks"),
   "We also broke the code on purpose. Deleting the CR3 reload, or merging the two passes, made tests fail. The Mac has passed only the baseline so far, so run check there first.")
 
+# ---- long only: the runner, then the live proof (chapters 3 and 6)
+S(3, code_view("scripts/smoke.py", (16, 33), (22, 28), ours=(1, 130), note="<p>Fails on any <code>FAIL</code> line, and requires vmtest's fault count to equal the kernel's <code>trap 14</code> lines.</p>", head="The runner"),
+  "The runner, scripts slash smoke dot py, starts vmtest and fails on any FAIL line. It also requires vmtest's fault count to equal the kernel's trap fourteen messages.", long=True)
+S(3, code_view("scripts/smoke.py", (89, 104), (90, 104), ours=(1, 130), note="<p>Boot, an echo, <code>forktest</code>, our <code>vmtest</code>, and for <code>check</code> the original <code>usertests</code>.</p>", head="The sequence"),
+  "Around that, it checks boot, an echo command, forktest, our vmtest, and for check, the original xv6 user tests.", long=True)
+S(3, code_view("scripts/xv6", (51, 66), (57, 65), ours=(1, 80), note="<p><code>build</code>, <code>run</code>, <code>smoke</code>, <code>check</code>, <code>clean</code>: the only commands you need.</p>", head="scripts/xv6"),
+  "scripts slash x v 6 is the command you type: build, run, smoke, check, and clean. Check runs the whole sequence including the original tests.", long=True)
+S(3, code_view(".github/workflows/baseline.yml", (12, 31), (23, 24), ours=(1, 40), note="<p>GitHub Actions runs <code>check</code> on every push: repeatable evidence.</p>", head="CI"),
+  "And GitHub Actions runs the same check on every push, so the evidence is repeatable and not just on your laptop.", long=True)
+
+# ---- long only: chapter 6, show it live in front of the examiner
+GLOG = ["$ git log --oneline xv6-baseline..HEAD"] + [l for l in (ROOT / "video/assets/git_log.txt").read_text().split("\n") if l.strip()]
+GDIFF = ["$ git diff --stat xv6-baseline -- '*.c' '*.h' '*.S' Makefile"] + [l for l in (ROOT / "video/assets/git_diff_stat.txt").read_text().split("\n") if l.strip()]
+LS = (ROOT / "video/assets/live_session.txt").read_text().replace("\r", "").split("\n")
+ls_cmd = LS.index("$ ls") if "$ ls" in LS else next(i for i, l in enumerate(LS) if l.startswith("$ ls"))
+demo_cmd = next(i for i, l in enumerate(LS) if l.startswith("$ vmdemo"))
+BOOT = ["$ ./scripts/xv6 run", "Exit QEMU: Ctrl-A, then X. Guest disks are fs.img and xv6.img."] + LS[:ls_cmd]
+LSOUT = LS[ls_cmd:demo_cmd]
+DEMO2 = LS[demo_cmd:]
+while DEMO2 and DEMO2[-1] == "":
+    DEMO2.pop()
+
+PRE = [
+    "Charge the laptop; <b>test it on the presentation machine</b>",
+    "<code>git pull</code> so you have the latest <code>main</code>",
+    "<code>./scripts/xv6 clean</code> then <code>check</code>: three PASS lines",
+    "Close every other QEMU window: one guest at a time",
+    "Keep a screen recording of a passing run as a backup",
+]
+S(6, bullets("Before the viva", PRE, 5, dim_prev=False),
+  "Now the part most people forget: how to prove it live. The day before, charge the laptop and test it on the presentation machine. Pull the latest code, run clean and then check, and expect three pass lines. Close other QEMU windows, and keep a recording as a backup.", long=True)
+S(6, term_view(GLOG, len(GLOG), (1, len(GLOG) - 1), head="Terminal: the project folder", note="<p>Start with the history: each checkpoint is one commit.</p>", noteh="Show the work"),
+  "Start by showing the work. git log shows each checkpoint as a commit, from the syscalls to the tests, the demo and the documentation.", long=True)
+S(6, term_view(GDIFF, len(GDIFF), (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13), head="Terminal: what changed", note="<p>Only these files differ from original xv6. The kernel part is <code>vm.c</code>, <code>sysproc.c</code>, <code>syscall.c</code>, <code>sysfile.c</code> and a few wiring lines.</p>", noteh="Ours vs xv6"),
+  "Then git diff stat against the xv6 baseline. Only these files differ from original xv6. The kernel part is vm.c, sysproc.c, syscall.c, sysfile.c, and a few wiring lines. Everything else is untouched.", long=True)
+S(6, term_view(TL, len(TL), (3, 4, 5), head="Terminal: the proof", note="<p>About 40 seconds. While it runs, explain what the three PASS lines mean.</p>", noteh="Run check"),
+  "Now run clean and check. It takes about forty seconds. While it runs, explain the three pass lines: the boot test, our vm test suite with ten expected faults, and the original xv6 tests.", long=True)
+S(6, term_view(BOOT, len(BOOT), (len(BOOT) - 1,), head="Terminal: start the guest", note="<p><code>./scripts/xv6 run</code> boots xv6 in QEMU. Exit later with <b>Ctrl-A, then X</b>.</p>", noteh="Run it"),
+  "Then run the project. The run command boots xv6 in QEMU. When you see the dollar prompt, you are inside the guest. Exit later with control A, then X.", long=True)
+LSE = BOOT + LSOUT
+S(6, term_view(LSE, len(LSE), tuple(i for i, l in enumerate(LSE) if l.startswith(("vmtest", "vmdemo"))), head="Terminal: inside xv6", note="<p><code>ls</code> shows our two programs next to the original ones.</p>", noteh="Our programs"),
+  "Type ls. Our two programs, vmtest and vmdemo, sit next to the original xv6 programs. That is how you know the Makefile change worked.", long=True)
+dN = len(DEMO2)
+S(6, term_view(DEMO2, dN, (1, 2, 3), head="Terminal: inside xv6", note="<p>Let the examiner choose: <code>vmdemo 1000 4</code> means value 1000, four pages. Real output.</p>", noteh="Examiner's numbers"),
+  "Now the demo. Ask the examiner for a value and a page count. Here we use one thousand and four pages. Scene one shows the writable control with their numbers.", long=True)
+fi = next(i for i, l in enumerate(DEMO2) if "STOPPED" in l)
+S(6, term_view(DEMO2, fi + 3, (fi - 1, fi), head="Terminal: inside xv6", note="<p>Point at <code>trap 14 err 7</code> and the word <b>STOPPED</b>. Then at <i>parent still alive</i>.</p>", noteh="Point here"),
+  "Point at two things. The kernel line, trap fourteen error seven, and the word stopped. Then say: the parent is still alive and its value did not change.", long=True)
+S(6, term_view(DEMO2, dN, (dN - 4, dN - 3), head="Terminal: inside xv6", note="<p>After <code>munprotect</code> writes work again; the shell is still running.</p>", noteh="Finish"),
+  "Finish with the last scene: after munprotect, writes work again, and the shell is still running. Then run vm test and an echo command to show the whole system survived.", long=True)
+MUTL = [
+    "$ # open vm.c and delete the line  lcr3(V2P(pgdir));",
+    "$ ./scripts/xv6 smoke",
+    "PASS: xv6 boot, shell command and upstream forktest",
+    "FAIL: vmtest reported a failure; inspect artifacts/*.log",
+    "$ grep FAIL artifacts/smoke.log",
+    "vmtest: FAIL mprotect takes effect immediately (TLB refreshed)",
+    "vmtest: 1 FAILED",
+    "$ git checkout -- vm.c      # restore the line",
+]
+S(6, term_view(MUTL, len(MUTL), (3, 5), head="Terminal: break it live", note="<p>Optional but impressive: delete the TLB flush, run the smoke test, see exactly one failure, then restore. This is real output from our earlier run.</p>", noteh="Prove the tests matter"),
+  "If you want a stronger proof, break it live. Delete the C R 3 reload line, run the smoke test, and watch the immediate effect test fail. Then restore the file with git checkout. This shows the tests really detect the bug.", long=True)
+MODL = [("$ " + l if i == 0 else l) for i, l in enumerate((ROOT / "video/assets/modify_output.txt").read_text().replace("\r", "").split("\n")) if l.strip() and l.strip() != "$"]
+S(6, term_view(MODL, 3, (1, 2), head="Terminal: a live change", note="<p>If the examiner asks for a change: edit, <code>./scripts/xv6 build</code>, <code>run</code>, show. Real output: all three examples applied to a scratch copy.</p>", noteh="Live change"),
+  "If the examiner asks for a change, make it, rebuild, run, and show it. This is real output with all three example changes applied to a scratch copy. getprot says one before. Then mprotect with five thousand bytes returns zero.", long=True)
+S(6, term_view(MODL, 5, (3, 4), head="Terminal: a live change", note="<p>5000 bytes rounds up to <b>two</b> pages. A kernel address gives <code>-1</code>.</p>", noteh="Bytes, rounded up"),
+  "Both pages now read as protected, because five thousand bytes rounds up to two pages. A kernel address gives minus one.", long=True)
+S(6, term_view(MODL, 7, (5, 6), head="Terminal: a live change", note="<p><code>munprotect(p, 1)</code> restores only the first page.</p>", noteh="Restore"),
+  "Unprotecting one byte restores only the first page.", long=True)
+S(6, term_view(MODL, len(MODL), (len(MODL) - 4, len(MODL) - 3), head="Terminal: a live change", note="<p>Our clearer message appears before the usual trap line; the parent keeps running.</p>", noteh="Clearer message"),
+  "And a write to a read-only page now prints our clearer message before the usual trap line, while the parent keeps running.", long=True)
+CHK2 = [
+    "Edit the <b>one</b> function that controls it",
+    "<code>./scripts/xv6 build</code> then <code>run</code>",
+    "Show the result, then explain <b>why</b> it works",
+    "Restore with <code>git checkout -- .</code>",
+    "Never edit anything you cannot explain",
+]
+S(6, bullets("Live change checklist", CHK2, 5, dim_prev=False),
+  "For any live change: edit the one function that controls it, rebuild, run, show the result, and explain why it works. Restore with git checkout. Never edit something you cannot explain.", long=True)
+TRB = [
+    "Guest hangs or <code>check</code> times out → close other QEMU, then <code>clean</code>",
+    "<code>vmdemo: not found</code> → <code>./scripts/xv6 clean</code> and run again",
+    "Mac is slow → QEMU emulates x86; be patient",
+    "Stuck in QEMU → <b>Ctrl-A</b>, then <b>X</b>",
+    "Total failure → play the backup recording",
+]
+S(6, bullets("If something goes wrong", TRB, 5, dim_prev=False),
+  "If something goes wrong: a hang means another QEMU is running, so close it and clean. Not found means an old disk image, so clean and run again. A slow Mac is normal. Control A then X leaves QEMU. And if all fails, play your backup recording.", long=True)
+OPEN = [
+    "I added two system calls, <code>mprotect</code> and <code>munprotect</code>",
+    "They clear or set <b>one bit</b>, <code>PTE_W</code>, on a range of pages",
+    "Hardware enforces it; I validate first, change second, then flush the TLB",
+    "I also made the kernel's own writes respect it",
+    "Let me show it, then I can walk through any block",
+]
+S(6, bullets("Your opening, 30 seconds", OPEN, 5, dim_prev=False),
+  "Finally, your opening. Say: I added two system calls that clear or set one bit on a range of pages. The hardware enforces it. I validate first, change second, then flush the TLB, and I made the kernel's own writes respect it. Let me show it, and then I can walk through any block.", long=True)
+
+
 # ---- chapter 4: modify
 M = [
     "Name the <b>files and function</b> that control the behaviour",
@@ -559,6 +745,14 @@ S(4, code_view(E3, (1, 18), (7, 7), ours=(1, 18), note="<p>Example 3: a clearer 
   "Example three: print a clearer message on a write fault. In trap.c, in the user branch, check for a page fault with the error bits present, write and user.")
 S(4, code_view(E3, (1, 18), (8, 9), ours=(1, 18), note="<p><code>PGROUNDDOWN</code> is already available through <code>mmu.h</code>. Put it <b>before</b> the existing message.</p>", head="Print the page"),
   "Print the faulting page with PGROUNDDOWN of rcr2, before the existing message. PGROUNDDOWN is already included through mmu.h.")
+E4 = "video/examples/limits_solution.c"
+LIM = [("$ " + l if i == 0 else l) for i, l in enumerate((ROOT / "video/assets/limits_output.txt").read_text().replace("\r", "").split("\n")) if l.strip() and l.strip() != "$"]
+S(4, code_view(E4, (5, 14), (9, 11), ours=(1, 14), note="<p>Example 4: refuse page 0 and cap each call at 16 pages. One condition in the <b>first check</b> of the shared helper.</p>", head="Refuse page 0, cap the length"),
+  "Example four: refuse page zero and allow at most sixteen pages per call. It is one condition in the first check of the shared helper.", long=True)
+S(4, code_view(E4, (5, 14), (13, 14), ours=(1, 14), note="<p>Because both calls share the helper, both rules apply to <code>mprotect</code> <b>and</b> <code>munprotect</code>.</p>", head="Why one place is enough"),
+  "Because mprotect and munprotect share the helper, both rules apply to both calls. Only a range that starts at zero can include page zero.", long=True)
+S(4, term_view(LIM, len(LIM), (1, 3, 5), head="Terminal: tested in the guest", note="<p>Real output from a scratch copy with the change applied. 16 pages work; 17 and page 0 return <code>-1</code>.</p>", noteh="It works"),
+  "We tested it in a scratch copy. Page zero is refused, sixteen pages work, seventeen returns minus one, and munprotect obeys the same cap.", long=True)
 IDEAS = [
     "Kill the caller instead of returning an error",
     "Refuse page <b>0</b>",
@@ -597,6 +791,31 @@ SPOKEN_A = [
     "CR0 WP makes kernel writes obey read-only pages, and a kernel fault panics. We check output buffers. Write only reads.",
     "copyuvm copies the flag bits into the child's own separate page.",
 ]
+
+
+if LONG:
+    QA += [
+        ("Can a process protect its own code at address 0?",
+         "Yes, code is a user page. Our project does not change null-pointer behaviour."),
+        ("What happens to protected pages after exec, or after sbrk shrinks the heap?",
+         "Exec builds a fresh address space. Shrinking frees the pages normally. New heap pages are writable."),
+        ("Is check-then-write safe with several CPUs and threads?",
+         "No: you would need locking or fault handling. Here there is one CPU and no threads, so nothing changes between the check and the write."),
+        ("Why do the tests use a pipe instead of wait?",
+         "xv6's wait returns no exit status, so a marker byte through a pipe shows whether the write succeeded."),
+        ("What would error code 6 mean instead of 7?",
+         "A user write to a page that is not present."),
+        ("What do mprotect and munprotect return?",
+         "0 on success and -1 on an invalid request, and an invalid request changes nothing."),
+    ]
+    SPOKEN_A += [
+        "Yes, code is a user page. Our project does not change null-pointer behaviour.",
+        "Exec builds a fresh address space. Shrinking frees the pages normally. New heap pages are writable.",
+        "No. You would need locking or fault handling. Here there is one CPU and no threads, so nothing changes between the check and the write.",
+        "xv6's wait returns no exit status, so a marker byte through a pipe shows whether the write succeeded.",
+        "A user write to a page that is not present.",
+        "Zero on success and minus one on an invalid request, and an invalid request changes nothing.",
+    ]
 
 
 def qa_view(i, stage):
@@ -669,8 +888,9 @@ def main():
             durs = list(ex.map(lambda p: make_audio(*p), enumerate(steps)))
     total = sum(durs)
     print(f"{n} steps, {fmt(total)} total")
-    if total > 15 * 60 + 30:
-        print("WARNING: longer than 15 minutes")
+    cap = 30 * 60 if LONG else 15 * 60 + 30
+    if total > cap:
+        print(f"WARNING: longer than the cap ({fmt(cap)})")
 
     t = 0.0
     chap_start = {}
@@ -712,13 +932,13 @@ const { chromium } = require('playwright'); const fs = require('fs'); const path
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(BUILD / "images.txt"),
          "-vf", "fps=10,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
          "-tune", "stillimage", str(BUILD / "video.mp4")])
-    out = OUT / "viva.mp4"
+    out = OUT / ("viva_full.mp4" if LONG else "viva.mp4")
     run(["ffmpeg", "-y", "-i", str(BUILD / "video.mp4"), "-i", str(BUILD / "full.wav"),
-         "-af", "highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=11", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
+         "-af", "highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=11", "-c:v", "copy", "-c:a", "aac", "-b:a", "64k", "-ac", "1",
          "-shortest", "-movflags", "+faststart", str(out)])
 
     # chapter timestamps and readable script
-    md = ["# Narration script and chapter times\n"]
+    md = ["# Narration script and chapter times" + (" (full 30-minute version)" if LONG else "") + "\n"]
     md.append("Spoken with a local offline voice; re-record in your own voice if you prefer.\n")
     cur = -1
     t = 0.0
@@ -729,9 +949,9 @@ const { chromium } = require('playwright'); const fs = require('fs'); const path
         if st["text"]:
             md.append(f"- {st['text']}")
         t += durs[i]
-    (ROOT / "video" / "narration.md").write_text("\n".join(md) + "\n")
+    (ROOT / "video" / ("narration_full.md" if LONG else "narration.md")).write_text("\n".join(md) + "\n")
     print(f"wrote {out} ({out.stat().st_size / 1e6:.1f} MB), {fmt(total)}")
-    print("chapters:", {CHAPTERS[k]: fmt(v) for k, v in chap_start.items()})
+    print("chapters:", {CHAPTERS[k]: fmt(chap_start[k]) for k in ORDER if k in chap_start})
 
 
 if __name__ == "__main__":

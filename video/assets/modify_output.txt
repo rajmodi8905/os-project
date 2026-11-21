@@ -1,0 +1,12 @@
+modtest
+getprot(p) before          = 1
+mprotect(p, 5000) bytes    = 0
+getprot(p), getprot(p+4096) = 0 0   (both pages protected)
+getprot(0x80000000)        = -1   (kernel address)
+munprotect(p, 1) bytes     = 0
+getprot(p), getprot(p+4096) = 1 0   (only first page restored)
+child now writes the read-only page:
+pid 4 modtest: write to read-only page 0x3000
+pid 4 modtest: trap 14 err 7 on cpu 0 eip 0x112 addr 0x3000--kill proc
+parent still running
+$ 

@@ -1,0 +1,54 @@
+xv6...
+cpu0: starting 0
+sb: size 1000 nblocks 941 ninodes 200 nlog 30 logstart 2 inodestart 32 bmap start 58
+init: starting sh
+$ ls
+.              1 1 512
+..             1 1 512
+README         2 2 2286
+cat            2 3 15372
+echo           2 4 14280
+forktest       2 5 8868
+grep           2 6 18308
+init           2 7 14876
+kill           2 8 14332
+ln             2 9 14232
+ls             2 10 16852
+mkdir          2 11 14360
+rm             2 12 14340
+sh             2 13 28428
+stressfs       2 14 15108
+usertests      2 15 63252
+wc             2 16 15760
+zombie         2 17 13916
+vmtest         2 18 28596
+vmdemo         2 19 17760
+console        3 20 0
+$ vmdemo 1000 4
+
+[1] 4 page(s) at 0x4000, writable control
+      stored and read back 1000 ... 1003
+
+[2] mprotect(0x4000, 4) = 0
+      protected read still works: 1000
+pid 5 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x7000--kill proc
+      child write of 1100 to 0x7000: STOPPED by page fault (child killed)
+      parent still alive, value unchanged: 1003
+
+[3] fork inheritance: a new child inherits the read-only page
+pid 6 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x4000--kill proc
+      inherited child write of 1200 to 0x4000: STOPPED by page fault (child killed)
+
+[4] invalid requests are rejected and change nothing
+      mprotect(0x4001, 1)  unaligned       = -1
+      mprotect(0x4000, 0)  zero length     = -1
+      munprotect(0x4000, 5) past heap end = -1
+pid 7 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x4000--kill proc
+      child (after rejected munprotect) write of 1300 to 0x4000: STOPPED by page fault (child killed)
+
+[5] munprotect(0x4000, 4) = 0
+      parent wrote and read back 1400
+      child write of 1500 to 0x4000: SUCCEEDED
+
+vmdemo done; the shell is still running.
+$ 

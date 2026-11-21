@@ -15,8 +15,8 @@ coursework, email drafts) never belong in this repository.
 - **Branch:** `main` is the up-to-date branch; study and demo from it. The
   working branch `claude/hopeful-hamilton-x2oed7` was fast-forwarded into
   `main` on 15 November 2026, so the commit hashes below are the same on both.
-- **Viva video:** `video/viva.mp4` (about 11 minutes, narrated, with captions) is
-  built and committed. It is made by `video/make_video.py` (HTML slides drawn with
+- **Viva videos:** `video/viva_full.mp4` (21:38, everything incl. a live-proof
+  chapter) and `video/viva.mp4` (11:17 summary) are built and committed. It is made by `video/make_video.py` (HTML slides drawn with
   Playwright, real code and real guest output, offline espeak-ng voice, FFmpeg).
   An earlier attempt with the repo2video skill was dropped: it needs online
   services and silently produced a silent, plain video. See `video/README.md`.
@@ -105,6 +105,8 @@ Key files: `vm.c` (`setuvmwrite`, `checkuvmwrite`, `copyout`), `sysproc.c`
   assistant session on the laptop).
 - **15 Nov 2026:** professor's requirements recorded; `DEMO.md`, `VIVA.md`
   and this handover added; all work fast-forwarded into `main`.
-- **21 Nov 2026:** viva video built (`video/make_video.py`, `video/viva.mp4`,
+- **21 Nov 2026:** full 21:38 video added (all code, full test tour, live-proof
+  chapter, extra modification examples and questions).
+- **21 Nov 2026:** short viva video built (`video/make_video.py`, `video/viva.mp4`,
   11:17). Checked in the container: audio track present at about -17 dB, audio and
   video lengths equal, frames inspected. The first repo2video attempt was removed.

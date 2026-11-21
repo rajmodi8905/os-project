@@ -1,0 +1,12 @@
+16e8e11 Replace the repo2video attempt with a self-built viva video
+f51c0d9 Warn about Node versions newer than 22 when rendering the video
+5a7a2b2 Document the viva video in the README and handover
+02e4906 Add viva video inputs: script, slides and render helper
+5c873a7 Point docs at main now that the project work is merged
+e366d4b Add public handover document for continuing the project
+12fad3d Add demo runbook and viva preparation guide
+1bfe935 Record Pop!_OS laptop and Linux CI validation results
+2c04dd5 Add vmdemo and an implementation walkthrough for the demonstration
+ae30160 Add page-protection correctness suite to vmtest and the serial runner
+8c21a17 Reject kernel writes into protected user buffers
+fd757a1 Add mprotect and munprotect system calls with a minimal test

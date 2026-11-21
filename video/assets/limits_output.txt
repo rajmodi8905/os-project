@@ -1,0 +1,6 @@
+limtest
+mprotect(0, 1)          = -1   (page 0 refused)
+mprotect(p, 16)         = 0   (16 pages allowed)
+mprotect(p, 17)         = -1   (over the cap)
+munprotect(p, 16)       = 0
+munprotect(p, 17)       = -1   (same cap)
