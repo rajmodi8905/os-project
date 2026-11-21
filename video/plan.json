@@ -1,0 +1,429 @@
+{
+ "title": "Read-only page protection in xv6: viva preparation",
+ "sections": [
+  {
+   "id": "intro",
+   "title": "Welcome: what this video covers",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Welcome: what this video covers"
+   ]
+  },
+  {
+   "id": "problem",
+   "title": "The problem statement",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "The problem statement"
+   ]
+  },
+  {
+   "id": "paging",
+   "title": "Background: how a virtual address becomes a physical page",
+   "type": "architecture",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Background: how a virtual address becomes a physical page"
+   ]
+  },
+  {
+   "id": "pteflags",
+   "title": "Background: the PTE permission bits",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "mmu.h"
+   ],
+   "keyPoints": [
+    "Background: the PTE permission bits"
+   ]
+  },
+  {
+   "id": "tlbwp",
+   "title": "Background: the TLB and the write-protect bit",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "entry.S"
+   ],
+   "keyPoints": [
+    "Background: the TLB and the write-protect bit"
+   ]
+  },
+  {
+   "id": "faultpath",
+   "title": "Background: what a protection fault looks like",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "trap.c"
+   ],
+   "keyPoints": [
+    "Background: what a protection fault looks like"
+   ]
+  },
+  {
+   "id": "solution",
+   "title": "Our solution at a glance",
+   "type": "architecture",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Our solution at a glance"
+   ]
+  },
+  {
+   "id": "wiring_user",
+   "title": "Wiring part 1: the user-side stubs",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "usys.S"
+   ],
+   "keyPoints": [
+    "Wiring part 1: the user-side stubs"
+   ]
+  },
+  {
+   "id": "wiring_kernel",
+   "title": "Wiring part 2: numbers and the dispatch table",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "syscall.c"
+   ],
+   "keyPoints": [
+    "Wiring part 2: numbers and the dispatch table"
+   ]
+  },
+  {
+   "id": "sysproc",
+   "title": "The syscall handlers and the shared helper call",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "sysproc.c"
+   ],
+   "keyPoints": [
+    "The syscall handlers and the shared helper call"
+   ]
+  },
+  {
+   "id": "setuv_a",
+   "title": "setuvmwrite part 1: validate the request",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "vm.c"
+   ],
+   "keyPoints": [
+    "setuvmwrite part 1: validate the request"
+   ]
+  },
+  {
+   "id": "setuv_b",
+   "title": "setuvmwrite part 2: change only the write bit",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "vm.c"
+   ],
+   "keyPoints": [
+    "setuvmwrite part 2: change only the write bit"
+   ]
+  },
+  {
+   "id": "overflow",
+   "title": "Why compare counts: the overflow example",
+   "type": "architecture",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Why compare counts: the overflow example"
+   ]
+  },
+  {
+   "id": "twopass",
+   "title": "Why two passes and why a TLB flush",
+   "type": "architecture",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Why two passes and why a TLB flush"
+   ]
+  },
+  {
+   "id": "fork",
+   "title": "Fork inherits protection: copyuvm",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "vm.c"
+   ],
+   "keyPoints": [
+    "Fork inherits protection: copyuvm"
+   ]
+  },
+  {
+   "id": "kbuf_problem",
+   "title": "The second door: the kernel writing into user memory",
+   "type": "architecture",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "The second door: the kernel writing into user memory"
+   ]
+  },
+  {
+   "id": "checkuvm",
+   "title": "checkuvmwrite: is this buffer writable?",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "vm.c"
+   ],
+   "keyPoints": [
+    "checkuvmwrite: is this buffer writable?"
+   ]
+  },
+  {
+   "id": "argptrw",
+   "title": "argptrw: the bounds check plus the writable check",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "syscall.c"
+   ],
+   "keyPoints": [
+    "argptrw: the bounds check plus the writable check"
+   ]
+  },
+  {
+   "id": "callers",
+   "title": "The three callers: read, fstat and pipe",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "sysfile.c"
+   ],
+   "keyPoints": [
+    "The three callers: read, fstat and pipe"
+   ]
+  },
+  {
+   "id": "copyout",
+   "title": "copyout: the backdoor through the kernel alias",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "vm.c"
+   ],
+   "keyPoints": [
+    "copyout: the backdoor through the kernel alias"
+   ]
+  },
+  {
+   "id": "test_design",
+   "title": "Tests: how to detect a fault from user code",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "vmtest.c"
+   ],
+   "keyPoints": [
+    "Tests: how to detect a fault from user code"
+   ]
+  },
+  {
+   "id": "test_basic",
+   "title": "The basic scenario",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "vmtest.c"
+   ],
+   "keyPoints": [
+    "The basic scenario"
+   ]
+  },
+  {
+   "id": "test_tlb",
+   "title": "The test that proves the TLB flush matters",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "vmtest.c"
+   ],
+   "keyPoints": [
+    "The test that proves the TLB flush matters"
+   ]
+  },
+  {
+   "id": "test_invalid",
+   "title": "Invalid arguments and atomic rejection",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "vmtest.c"
+   ],
+   "keyPoints": [
+    "Invalid arguments and atomic rejection"
+   ]
+  },
+  {
+   "id": "runner",
+   "title": "The serial runner cross-checks the kernel",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "scripts/smoke.py"
+   ],
+   "keyPoints": [
+    "The serial runner cross-checks the kernel"
+   ]
+  },
+  {
+   "id": "demo_code",
+   "title": "The demo program",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "vmdemo.c"
+   ],
+   "keyPoints": [
+    "The demo program"
+   ]
+  },
+  {
+   "id": "demo_run",
+   "title": "Running the demo and what to say",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Running the demo and what to say"
+   ]
+  },
+  {
+   "id": "evidence",
+   "title": "The evidence we collected",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "The evidence we collected"
+   ]
+  },
+  {
+   "id": "mod_intro",
+   "title": "If the examiner says: change this code",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "If the examiner says: change this code"
+   ]
+  },
+  {
+   "id": "mod_getprot",
+   "title": "Example 1: add a getprot system call",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "video/examples/getprot_solution.c"
+   ],
+   "keyPoints": [
+    "Example 1: add a getprot system call"
+   ]
+  },
+  {
+   "id": "mod_bytes",
+   "title": "Example 2: make len a count of bytes",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "video/examples/bytes_solution.c"
+   ],
+   "keyPoints": [
+    "Example 2: make len a count of bytes"
+   ]
+  },
+  {
+   "id": "mod_message",
+   "title": "Example 3: print a clearer fault message",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "video/examples/fault_message_solution.c"
+   ],
+   "keyPoints": [
+    "Example 3: print a clearer fault message"
+   ]
+  },
+  {
+   "id": "mod_more",
+   "title": "Other changes you might be asked",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Other changes you might be asked"
+   ]
+  },
+  {
+   "id": "mod_experiments",
+   "title": "Break it on purpose and predict the failure",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Break it on purpose and predict the failure"
+   ]
+  },
+  {
+   "id": "qa1",
+   "title": "Viva questions, round 1: design",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Viva questions, round 1: design"
+   ]
+  },
+  {
+   "id": "qa2",
+   "title": "Viva questions, round 2: faults and fork",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Viva questions, round 2: faults and fork"
+   ]
+  },
+  {
+   "id": "qa3",
+   "title": "Viva questions, round 3: kernel buffers and limits",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Viva questions, round 3: kernel buffers and limits"
+   ]
+  },
+  {
+   "id": "summary",
+   "title": "Summary and how to own this",
+   "type": "summary",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Summary and how to own this"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,71 @@
+{
+ "title": "Read-only page protection in xv6: viva part 1",
+ "sections": [
+  {
+   "id": "intro",
+   "title": "Welcome: what this video covers",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Welcome: what this video covers"
+   ]
+  },
+  {
+   "id": "problem",
+   "title": "The problem statement",
+   "type": "overview",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "The problem statement"
+   ]
+  },
+  {
+   "id": "paging",
+   "title": "Background: how a virtual address becomes a physical page",
+   "type": "architecture",
+   "targetDurationSec": 60,
+   "filePaths": [],
+   "keyPoints": [
+    "Background: how a virtual address becomes a physical page"
+   ]
+  },
+  {
+   "id": "pteflags",
+   "title": "Background: the PTE permission bits",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "mmu.h"
+   ],
+   "keyPoints": [
+    "Background: the PTE permission bits"
+   ]
+  },
+  {
+   "id": "tlbwp",
+   "title": "Background: the TLB and the write-protect bit",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "entry.S"
+   ],
+   "keyPoints": [
+    "Background: the TLB and the write-protect bit"
+   ]
+  },
+  {
+   "id": "faultpath",
+   "title": "Background: what a protection fault looks like",
+   "type": "code_walkthrough",
+   "targetDurationSec": 60,
+   "filePaths": [
+    "trap.c"
+   ],
+   "keyPoints": [
+    "Background: what a protection fault looks like"
+   ]
+  }
+ ]
+}

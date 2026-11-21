@@ -1,0 +1,160 @@
+[
+ {
+  "sectionId": "intro",
+  "narration": "Welcome. This video is your viva preparation for the read-only page protection project in x86 x v 6. It has four parts. First, the problem and the background you need. Second, our solution and a walkthrough of every block of code we added. Third, the tests, the demo and the evidence. Fourth, the part your professor cares about most: how to change the code yourself. We will look at three example modifications, then go through the likely viva questions with short answers. One rule from your professor: AI help is allowed, but you must own every line. So pause the video often, and rewrite each function from memory.",
+  "codeBlocks": [],
+  "estimatedDurationSec": 42,
+  "slides": {
+   "description": "Viva preparation: read-only page protection in x86 xv6",
+   "bullets": [
+    "Part 1: the problem and the background",
+    "Part 2: our solution, block by block",
+    "Part 3: tests, demo and evidence",
+    "Part 4: modify the code yourself, then viva questions",
+    "Rule: you must own and explain every line"
+   ]
+  }
+ },
+ {
+  "sectionId": "problem",
+  "narration": "The assignment comes from the O S T E P virtual memory project. We must add two system calls to x v 6. m protect takes a page-aligned address and a length in pages, and makes those pages read-only. m unprotect does the reverse and restores write permission. Both return zero on success and minus one on an invalid request. A program must still be able to read a protected page. Only writes must be stopped. A write to a protected page must kill that process, not the whole system. Three extra requirements matter. A failed call must change nothing. The change must take effect immediately. And the permissions must survive fork, with parent and child independent afterwards. Null pointer protection, swapping and copy on write are out of scope.",
+  "codeBlocks": [],
+  "estimatedDurationSec": 50,
+  "slides": {
+   "description": "Read-only page protection in x86 xv6",
+   "bullets": [
+    "`int mprotect(void *addr, int len)` makes `len` pages read-only",
+    "`int munprotect(void *addr, int len)` restores write access",
+    "`addr` is page-aligned and `len` counts pages, not bytes",
+    "Reads still work; a write must kill only that process",
+    "A failed call changes nothing; the change is immediate",
+    "Permissions survive `fork()` and stay independent"
+   ]
+  }
+ },
+ {
+  "sectionId": "paging",
+  "narration": "Before the solution, the hardware. A page is 4096 bytes. A 32-bit virtual address splits into three fields. The top ten bits pick an entry in the page directory. The next ten bits pick an entry in a page table. The low twelve bits are the offset inside the page. The register C R 3 holds the physical address of the page directory. The entry that finally names the physical page is the page table entry, or P T E. Page number is the address divided by 4096. Offset is the address modulo 4096. A page-aligned address has offset zero. Alongside the physical page number, the P T E stores permission bits. Our whole project is about changing one of them.",
+  "codeBlocks": [],
+  "estimatedDurationSec": 47,
+  "slides": {
+   "description": "Two-level x86 paging",
+   "bullets": [
+    "Page size is 4096 bytes: offset = address % 4096",
+    "Top 10 bits: page directory index (`PDX`)",
+    "Next 10 bits: page table index (`PTX`)",
+    "`CR3` points to the page directory of the running process",
+    "The PTE holds the physical page plus permission bits"
+   ]
+  },
+  "mermaidDiagram": "graph LR\n  VA[Virtual address] --> PD[Page directory via CR3]\n  PD -->|PDX| PT[Page table]\n  PT -->|PTX| PTE[PTE: physical page + flags]\n  PTE --> PA[Physical page + offset]"
+ },
+ {
+  "sectionId": "pteflags",
+  "narration": "This is mmu dot h. Here are the constants we use all project long. P G S I Z E is 4096. P G R O U N D D O W N rounds an address down to its page. P T E underscore P means present. P T E underscore W means writable. P T E underscore U means user accessible. P T E underscore A D D R keeps the physical page. P T E underscore F L A G S keeps the low twelve bits, the permissions. To clear a bit we AND with the inverse of the mask. To set a bit we OR with the mask. To test a bit we AND and compare with zero. Remember these three bit operations. The viva will probe them.",
+  "codeBlocks": [
+   {
+    "filePath": "mmu.h",
+    "startLine": 82,
+    "endLine": 101,
+    "focusStart": 94,
+    "commentHints": [
+     {
+      "insertAfterLine": 85,
+      "comment": "`PGSIZE` is 4096 bytes"
+     },
+     {
+      "insertAfterLine": 91,
+      "comment": "`PGROUNDDOWN` clears the low 12 bits"
+     },
+     {
+      "insertAfterLine": 94,
+      "comment": "`PTE_P`: the page is mapped"
+     },
+     {
+      "insertAfterLine": 95,
+      "comment": "`PTE_W`: writes are allowed. Our project toggles this bit"
+     },
+     {
+      "insertAfterLine": 96,
+      "comment": "`PTE_U`: user mode may access the page"
+     },
+     {
+      "insertAfterLine": 100,
+      "comment": "`PTE_ADDR` keeps the physical page"
+     },
+     {
+      "insertAfterLine": 101,
+      "comment": "`PTE_FLAGS` keeps the low 12 permission bits"
+     }
+    ],
+    "revealOrder": 1
+   }
+  ],
+  "estimatedDurationSec": 50
+ },
+ {
+  "sectionId": "tlbwp",
+  "narration": "Two hardware facts shape the design. First, the T L B. The processor caches translations together with their permissions. If we change a P T E, the processor may keep using the old cached copy. Writing C R 3 flushes this cache. That is why our code reloads C R 3. Second, look at entry dot S. It turns on paging and also sets C R 0 W P, the write-protect flag. With W P set, even the kernel obeys read-only pages. That sounds safe, but it creates a trap for us: if the kernel itself writes into a protected user page, it page faults in kernel mode. We will meet that again in part two.",
+  "codeBlocks": [
+   {
+    "filePath": "entry.S",
+    "startLine": 48,
+    "endLine": 56,
+    "focusStart": 55,
+    "commentHints": [
+     {
+      "insertAfterLine": 52,
+      "comment": "`CR3` is loaded with the boot page directory"
+     },
+     {
+      "insertAfterLine": 54,
+      "comment": "read control register 0"
+     },
+     {
+      "insertAfterLine": 55,
+      "comment": "`CR0_PG` turns paging on; `CR0_WP` makes the kernel obey read-only pages"
+     }
+    ],
+    "revealOrder": 1
+   }
+  ],
+  "estimatedDurationSec": 45
+ },
+ {
+  "sectionId": "faultpath",
+  "narration": "This is the existing trap handler. When user code writes to a read-only page, the processor raises trap number fourteen, a page fault. The default case checks the saved code segment. If the fault came from user mode, x v 6 prints a message, marks the process killed, and exits it on the way back to user space. Decode the message. Error code seven is one plus two plus four. One means the page was present. Two means the access was a write. Four means user mode. So trap fourteen error seven is exactly: a user write to a present page without write permission. That is our protection firing. If the fault came from kernel mode, the branch above calls panic, and the whole machine stops.",
+  "codeBlocks": [
+   {
+    "filePath": "trap.c",
+    "startLine": 82,
+    "endLine": 95,
+    "focusStart": 89,
+    "commentHints": [
+     {
+      "insertAfterLine": 83,
+      "comment": "kernel-mode fault: this is a kernel bug"
+     },
+     {
+      "insertAfterLine": 87,
+      "comment": "`panic` stops the whole system"
+     },
+     {
+      "insertAfterLine": 89,
+      "comment": "user mode: assume the process misbehaved"
+     },
+     {
+      "insertAfterLine": 93,
+      "comment": "`err` and `rcr2()` give the reason and the faulting address"
+     },
+     {
+      "insertAfterLine": 94,
+      "comment": "only this process is marked killed; the parent lives on"
+     }
+    ],
+    "revealOrder": 1
+   }
+  ],
+  "estimatedDurationSec": 48
+ }
+]

@@ -1,0 +1,286 @@
+[
+ {
+  "sectionId": "test_design",
+  "narration": "Part three: proving it works. In vmtest dot c, allocate pages uses sbrk to round the heap up to a page boundary and return fresh pages, so a test never protects the stack or malloc data. The key helper is child write faults. x v 6's wait returns no exit status, so we use a pipe as a marker. The child writes to the address, and only if that succeeds, writes one byte to the pipe. The parent reads the pipe. End of file means the child died before the marker, so the write faulted. A byte means the write went through. That is how a test distinguishes a blocked write from a successful one.",
+  "codeBlocks": [
+   {
+    "filePath": "vmtest.c",
+    "startLine": 22,
+    "endLine": 68,
+    "focusStart": 53,
+    "commentHints": [
+     {
+      "insertAfterLine": 23,
+      "comment": "fresh, page-aligned pages that nothing else uses"
+     },
+     {
+      "insertAfterLine": 30,
+      "comment": "`sbrk` grows the heap by the padding plus the pages"
+     },
+     {
+      "insertAfterLine": 35,
+      "comment": "returns 1 if the child was stopped by a fault"
+     },
+     {
+      "insertAfterLine": 48,
+      "comment": "a child, so the fault kills it and not the test"
+     },
+     {
+      "insertAfterLine": 57,
+      "comment": "the write under test"
+     },
+     {
+      "insertAfterLine": 58,
+      "comment": "marker: only reached if the write succeeded"
+     },
+     {
+      "insertAfterLine": 62,
+      "comment": "EOF means the child died before the marker"
+     },
+     {
+      "insertAfterLine": 65,
+      "comment": "count it; the runner checks this number later"
+     }
+    ],
+    "revealOrder": 1
+   }
+  ],
+  "estimatedDurationSec": 44
+ },
+ {
+  "sectionId": "test_basic",
+  "narration": "The basic test walks the story. Store a value and read it back. Protect the page. Read it again, still works. A child writing to it faults. The parent's value is unchanged. Unprotect, write a new value, read it back. And a child writing now succeeds. Each line is a check, and every check prints ok or FAIL, with a description, so a failure tells you exactly which behaviour broke.",
+  "codeBlocks": [
+   {
+    "filePath": "vmtest.c",
+    "startLine": 70,
+    "endLine": 86,
+    "focusStart": 78,
+    "commentHints": [
+     {
+      "insertAfterLine": 75,
+      "comment": "allocation works"
+     },
+     {
+      "insertAfterLine": 77,
+      "comment": "writable control"
+     },
+     {
+      "insertAfterLine": 78,
+      "comment": "protect"
+     },
+     {
+      "insertAfterLine": 79,
+      "comment": "reads still work"
+     },
+     {
+      "insertAfterLine": 80,
+      "comment": "writes fault"
+     },
+     {
+      "insertAfterLine": 82,
+      "comment": "restore"
+     },
+     {
+      "insertAfterLine": 85,
+      "comment": "writes work again"
+     }
+    ],
+    "revealOrder": 1
+   }
+  ],
+  "estimatedDurationSec": 27
+ },
+ {
+  "sectionId": "test_tlb",
+  "narration": "This is the test I would highlight in a viva. The child writes the page first, which loads a writable translation into the T L B. Then it calls m protect and writes again immediately, with no context switch. If m protect forgot to reload C R 3, the cached writable translation would let the second write succeed, and the marker byte would reach the parent. With the reload, the second write faults. We checked this by deleting the reload line: the test failed with the message m protect takes effect immediately. Then we restored the line.",
+  "codeBlocks": [
+   {
+    "filePath": "vmtest.c",
+    "startLine": 88,
+    "endLine": 125,
+    "focusStart": 104,
+    "commentHints": [
+     {
+      "insertAfterLine": 90,
+      "comment": "explains the whole idea in two lines"
+     },
+     {
+      "insertAfterLine": 98,
+      "comment": "a fork gives the child its own address space"
+     },
+     {
+      "insertAfterLine": 101,
+      "comment": "first write: caches a writable translation"
+     },
+     {
+      "insertAfterLine": 102,
+      "comment": "protect, with no context switch afterwards"
+     },
+     {
+      "insertAfterLine": 103,
+      "comment": "this second write must fault"
+     },
+     {
+      "insertAfterLine": 104,
+      "comment": "marker: seeing it means the flush is missing"
+     }
+    ],
+    "revealOrder": 1
+   }
+  ],
+  "estimatedDurationSec": 37
+ },
+ {
+  "sectionId": "test_invalid",
+  "narration": "The invalid test lists every rejected request: an unaligned address, a zero length, a negative length, an overflowing length, an address that wraps, a page past the heap end, a kernel address, and the stack guard page. It computes the guard page address from a local variable's stack page, minus one page. Then comes atomicity: a range that starts with valid pages but ends in an invalid one must return minus one, and the earlier pages must stay exactly as they were. The suite checks that with a child write after each rejection. This is the test that caught our merged-passes mutation.",
+  "codeBlocks": [
+   {
+    "filePath": "vmtest.c",
+    "startLine": 206,
+    "endLine": 245,
+    "focusStart": 214,
+    "commentHints": [
+     {
+      "insertAfterLine": 208,
+      "comment": "two valid pages from the heap"
+     },
+     {
+      "insertAfterLine": 212,
+      "comment": "the guard page sits just below the stack page"
+     },
+     {
+      "insertAfterLine": 214,
+      "comment": "unaligned address"
+     },
+     {
+      "insertAfterLine": 216,
+      "comment": "zero length"
+     },
+     {
+      "insertAfterLine": 218,
+      "comment": "overflowing length"
+     },
+     {
+      "insertAfterLine": 220,
+      "comment": "past the end of the process"
+     },
+     {
+      "insertAfterLine": 221,
+      "comment": "kernel address"
+     }
+    ],
+    "revealOrder": 1
+   }
+  ],
+  "estimatedDurationSec": 39
+ },
+ {
+  "sectionId": "runner",
+  "narration": "A printed PASS is not enough evidence, so the runner in smoke dot py cross-checks. It starts vmtest, waits for the prompt, and requires the success line and no FAIL line. Then it counts the faulting children that vmtest reported and the kernel diagnostics that say trap fourteen error seven. These two numbers must be equal, and not zero. Finally it sends an echo command and checks the shell still answers. That proves each killed child did not take the shell down. In our runs, the number was ten.",
+  "codeBlocks": [
+   {
+    "filePath": "scripts/smoke.py",
+    "startLine": 16,
+    "endLine": 33,
+    "focusStart": 24,
+    "commentHints": [
+     {
+      "insertAfterLine": 18,
+      "comment": "start the suite in the guest shell"
+     },
+     {
+      "insertAfterLine": 22,
+      "comment": "any FAIL line, or no success line, fails the run"
+     },
+     {
+      "insertAfterLine": 24,
+      "comment": "faults that vmtest counted in user space"
+     },
+     {
+      "insertAfterLine": 25,
+      "comment": "fault diagnostics the kernel printed"
+     },
+     {
+      "insertAfterLine": 26,
+      "comment": "these two numbers must match"
+     },
+     {
+      "insertAfterLine": 29,
+      "comment": "the shell must still answer afterwards"
+     }
+    ],
+    "revealOrder": 1
+   }
+  ],
+  "estimatedDurationSec": 34
+ },
+ {
+  "sectionId": "demo_code",
+  "narration": "For the live demo, vm demo wraps the same idea in friendly output. Try write forks a child that writes, and the parent prints whether it succeeded or was stopped by a page fault. The program takes an optional value and page count, so the examiner can choose them. Run it as vm demo, or vm demo seven three. It shows five scenes: a writable control, protection with a faulting child, fork inheritance, rejected requests that change nothing, and the restored write.",
+  "codeBlocks": [
+   {
+    "filePath": "vmdemo.c",
+    "startLine": 20,
+    "endLine": 40,
+    "focusStart": 30,
+    "commentHints": [
+     {
+      "insertAfterLine": 22,
+      "comment": "who is writing, which address, which value"
+     },
+     {
+      "insertAfterLine": 28,
+      "comment": "a child, so a fault kills only the child"
+     },
+     {
+      "insertAfterLine": 30,
+      "comment": "the write under test"
+     },
+     {
+      "insertAfterLine": 35,
+      "comment": "parent waits for a marker byte"
+     },
+     {
+      "insertAfterLine": 38,
+      "comment": "prints SUCCEEDED or STOPPED by page fault"
+     }
+    ],
+    "revealOrder": 1
+   }
+  ],
+  "estimatedDurationSec": 32
+ },
+ {
+  "sectionId": "demo_run",
+  "narration": "To present, open the project on Pop O S or your Mac. Run the clean command, then check, and confirm three PASS lines. Then start the guest with the run command. At the prompt, type vm demo. Walk through each numbered scene and point at the kernel line saying trap fourteen error seven. Then let the examiner pick numbers, for example vm demo seven three. Finish with vm test and an echo command, showing the shell is alive. Exit QEMU with control A, then X. Keep a recording of a passing run as a backup.",
+  "codeBlocks": [],
+  "estimatedDurationSec": 37,
+  "slides": {
+   "description": "Details are in docs/DEMO.md",
+   "bullets": [
+    "`./scripts/xv6 clean` then `./scripts/xv6 check`: three PASS lines",
+    "`./scripts/xv6 run` starts the guest; exit with Ctrl-A, then X",
+    "`vmdemo` then `vmdemo 7 3` (examiner picks the numbers)",
+    "Point at `trap 14 err 7`: page fault, write, user mode",
+    "`vmtest` then `echo alive` shows the shell survived"
+   ]
+  }
+ },
+ {
+  "sectionId": "evidence",
+  "narration": "What can you honestly claim? The full check passed in three places: a Linux cloud container, GitHub Actions, and your Pop O S laptop with its own fresh clone. Each check includes the boot test, the vm test suite with ten expected faults, and the original x v 6 user tests. We also broke the code on purpose. Removing the T L B flush made the immediate-effect test fail. Merging the two passes made the atomic-rejection tests fail. And swapping arg ptr w back to arg ptr crashes the kernel. The macOS Mac passed only the baseline setup so far, so run check there once before relying on it.",
+  "codeBlocks": [],
+  "estimatedDurationSec": 42,
+  "slides": {
+   "description": "Everything is recorded in docs/VALIDATION.md",
+   "bullets": [
+    "Linux container, GitHub Actions and Pop!_OS: all three PASS lines",
+    "10 write faults seen by `vmtest` = 10 kernel fault messages",
+    "Removing `lcr3` makes the immediate-effect test fail",
+    "Merging the two passes makes the atomic tests fail",
+    "Mac: baseline only so far; run `check` there before using it"
+   ]
+  }
+ }
+]

@@ -21,3 +21,4 @@ mkfs
 .DS_Store
 __pycache__/
 *.pyc
+/video/out/
