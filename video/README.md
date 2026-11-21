@@ -1,90 +1,43 @@
-# Viva video: inputs and how to render
+# Viva video
 
-A narrated video (about 26 minutes, under the 30 minute cap) that explains the
-whole project for the viva: the problem, the solution, a block-by-block code
-walkthrough with the **real code on screen**, the tests and demo, three worked
-"change this snippet" examples, and the viva questions with answers.
+**`video/viva.mp4`** is the finished video (about 11 minutes, with narration and
+captions). Play it directly; no setup needed. After `git pull` it is in this folder.
 
-It is produced by [repo2video](https://github.com/kuncevichandrew2/repo2video)
-(a Claude Code skill; its renderer lives in
-[repotutor](https://github.com/kuncevichandrew2/repotutor)). The script and
-slides were written ahead of time and are committed here, so no AI session is
-needed to render it.
-
-**Status:** the inputs (this folder) are validated against the real source
-files. The final render has **not** been run yet: the cloud container used to
-write this blocks the network access that Remotion and the Edge TTS voice need.
-Render it on your laptop with the steps below. If it fails, paste the error to
-an assistant (point it at `docs/HANDOVER.md`).
-
-## Render it (Mac or Pop!_OS)
-
-Prerequisites: **Node 18 to 22 (Node 22 recommended)**, FFmpeg with libmp3lame,
-Git, Python 3, internet access. Newer Node versions (such as 26) can fail while
-installing the engine's `canvas` package; with nvm run `nvm install 22 && nvm use 22`.
-
-```bash
-# Pop!_OS / Ubuntu
-sudo apt install nodejs npm ffmpeg git python3
-# macOS
-brew install node ffmpeg git
-```
-
-Then, from the project root on `main`:
-
-```bash
-./video/render.sh
-```
-
-The first run downloads the engine to `~/.repo2video` and a headless Chromium
-(about 90 MB). The finished file is `video/out/viva.mp4` (ignored by Git).
-
-If one big render runs out of memory or time, render the four parts and join
-them automatically, or render one part at a time:
-
-```bash
-PART=parts ./video/render.sh
-PART=2 ./video/render.sh      # only part 2 -> video/out/viva_part2.mp4
-```
-
-## What is in this folder
-
-| File | Purpose |
+| Time | Chapter |
 | --- | --- |
-| `build_inputs.py` | Source of truth for the script and slides. Writes the JSON files below and **fails if a line range no longer matches the source files** |
-| `plan.json`, `scripts.json` | Engine inputs for the full video (generated) |
-| `parts/` | The same, split into the four parts (generated) |
-| `narration.md` | The full spoken script in readable form; re-record it in your own voice if you prefer |
-| `examples/` | Worked answers shown in part 4 (illustration only, not built into xv6) |
-| `render.sh` | One-command render helper |
+| 0:00 | Problem statement |
+| 0:54 | Background: paging, PTE bits, TLB, `CR0.WP`, the fault path |
+| 2:34 | Solution: syscall wiring, `setuvmwrite`, overflow, two passes, fork, kernel buffers |
+| 6:16 | Tests and the live demo (real output from the xv6 guest), evidence |
+| 7:56 | Modify it: three worked "change this snippet" examples, ideas, experiments |
+| 9:35 | Viva Q&A: six rapid-fire questions, with a pause to answer aloud |
 
-## Chapters
+Every code view is read from the real source files, and the terminal scenes use
+real output captured from the guest (`assets/`). Green bars mark lines we added;
+grey bars mark existing xv6 code. The voice is a local offline voice, so it
+sounds robotic; captions are shown on screen. `narration.md` has the full script
+if you want to re-record it in your own voice.
 
-| Part | Content | About |
-| --- | --- | --- |
-| 1 | Problem statement, paging, PTE bits, TLB and `CR0.WP`, the fault path | 5 min |
-| 2 | Solution overview, syscall wiring, `setuvmwrite`, overflow, fork, kernel buffers, `checkuvmwrite`, `argptrw`, `copyout` | 10 min |
-| 3 | Test design, the TLB test, invalid and atomic tests, runner, demo, evidence | 5 min |
-| 4 | Three modification examples, more ideas, break-it experiments, three rounds of viva questions, summary | 7 min |
+## Rebuild it (optional)
 
-## Editing the video
+Only needed if you change the script or the code. Needs Python 3, `pygments`,
+FFmpeg, `espeak-ng` (+ `mbrola` voices for a smoother voice), and Node with
+Playwright. No internet is needed while building.
 
-1. Edit the text in `build_inputs.py` (narration, slide bullets, code ranges).
-2. Run `python3 video/build_inputs.py`. It prints the length of each part and
-   stops with an error if any line range is wrong.
-3. Commit, then run `./video/render.sh`. The renderer works from the committed
-   files (`git archive HEAD`), so commit your edits first.
+```bash
+pip install pygments
+sudo apt install ffmpeg espeak-ng mbrola mbrola-us2   # Pop!_OS / Ubuntu
+python3 video/make_video.py            # writes video/out/viva.mp4
+python3 video/make_video.py --frames   # quick check: frames only, no audio
+```
 
-If you change a source file such as `vm.c`, line numbers move. Update the ranges
-in `build_inputs.py`; the check will tell you if you forget.
+The script text, slides and line ranges are all in `make_video.py`. It stops
+with an error if a line range no longer matches the source file, so after
+editing `vm.c` and friends, update the numbers there. Set `VOICE=en-us` if the
+mbrola voice is missing, or `SPEED=140` to talk slower.
 
-## Troubleshooting
-
-| Problem | Fix |
+| Folder | Content |
 | --- | --- |
-| `Chromium not found` | `cd ~/.repo2video && npx remotion browser ensure` |
-| Silent video | The Edge TTS voice could not connect; check the network and rerun |
-| `npm error ... node_modules/canvas ... pixman-1 was not found` | Node is too new: `nvm install 22 && nvm use 22`, then `rm -rf ~/.repo2video` and rerun. Alternative: `sudo apt install build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev` |
-| `Cannot find module` | `cd ~/.repo2video && npm install` |
-| Slides show only plain titles | Remotion failed and the engine used its simple FFmpeg fallback; read the warning near the top of the output |
-| Narration over 30 minutes | Slow voice: set `EDGE_TTS_VOICE` to a faster one or shorten narration in `build_inputs.py` |
+| `assets/guest_output.txt` | Real `vmdemo 7 3` + `vmtest` output from the xv6 guest |
+| `assets/check_output.txt` | Real `./scripts/xv6 check` result lines |
+| `examples/` | The three worked answers shown in "Modify it" (illustration only, not built into xv6) |

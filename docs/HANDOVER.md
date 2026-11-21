@@ -15,11 +15,11 @@ coursework, email drafts) never belong in this repository.
 - **Branch:** `main` is the up-to-date branch; study and demo from it. The
   working branch `claude/hopeful-hamilton-x2oed7` was fast-forwarded into
   `main` on 15 November 2026, so the commit hashes below are the same on both.
-- **Viva video:** inputs are in `video/` (script, slides, `render.sh`) and are
-  validated, but the final MP4 has **not** been rendered yet. The cloud
-  container blocks what the renderer (Remotion) and the Edge TTS voice need.
-  The student renders it on their laptop with `./video/render.sh`; see
-  `video/README.md`. If the render fails, debug from the error output.
+- **Viva video:** `video/viva.mp4` (about 11 minutes, narrated, with captions) is
+  built and committed. It is made by `video/make_video.py` (HTML slides drawn with
+  Playwright, real code and real guest output, offline espeak-ng voice, FFmpeg).
+  An earlier attempt with the repo2video skill was dropped: it needs online
+  services and silently produced a silent, plain video. See `video/README.md`.
 - **Phase now:** the student is preparing for the demo and viva. The deadline
   is the end-semester exam date + 3 days. The professor allows AI help, but the
   student must own the code: explain any block, and modify it without AI.
@@ -105,7 +105,6 @@ Key files: `vm.c` (`setuvmwrite`, `checkuvmwrite`, `copyout`), `sysproc.c`
   assistant session on the laptop).
 - **15 Nov 2026:** professor's requirements recorded; `DEMO.md`, `VIVA.md`
   and this handover added; all work fast-forwarded into `main`.
-- **21 Nov 2026:** viva video inputs added (`video/`). Pipeline checked end to
-  end in the container with an offline voice (38 sections, 22 code blocks read
-  from the real files, 26.6 minutes), but Remotion could not run there, so the
-  real render is pending on the laptop.
+- **21 Nov 2026:** viva video built (`video/make_video.py`, `video/viva.mp4`,
+  11:17). Checked in the container: audio track present at about -17 dB, audio and
+  video lengths equal, frames inspected. The first repo2video attempt was removed.

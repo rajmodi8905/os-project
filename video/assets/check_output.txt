@@ -1,0 +1,3 @@
+PASS: xv6 boot, shell command and upstream forktest
+PASS: vmtest page protection (10 expected user write faults, shell still alive)
+PASS: upstream usertests

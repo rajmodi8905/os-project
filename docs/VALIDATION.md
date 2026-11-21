@@ -60,7 +60,7 @@ Same environment as checkpoint 3.
 
 ## 7 November 2026 — checkpoint 5: correctness suite
 
-Same environment as checkpoint 3. `vmtest` contains 66 checks: basic
+Same environment as checkpoint 3. `vmtest` contains 65 checks: basic
 protect/read/unprotect, immediate effect (TLB refresh), repeated calls, a
 three-page range with untouched neighbours, fork inheritance and independence
 in both directions, invalid arguments (unaligned, zero, negative, overflowing,

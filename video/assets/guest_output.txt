@@ -1,0 +1,125 @@
+vmdemo 7 3
+
+[1] 3 page(s) at 0x4000, writable control
+      stored and read back 7 ... 9
+
+[2] mprotect(0x4000, 3) = 0
+      protected read still works: 7
+pid 4 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x6000--kill proc
+      child write of 107 to 0x6000: STOPPED by page fault (child killed)
+      parent still alive, value unchanged: 9
+
+[3] fork inheritance: a new child inherits the read-only page
+pid 5 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x4000--kill proc
+      inherited child write of 207 to 0x4000: STOPPED by page fault (child killed)
+
+[4] invalid requests are rejected and change nothing
+      mprotect(0x4001, 1)  unaligned       = -1
+      mprotect(0x4000, 0)  zero length     = -1
+      munprotect(0x4000, 4) past heap end = -1
+pid 6 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x4000--kill proc
+      child (after rejected munprotect) write of 307 to 0x4000: STOPPED by page fault (child killed)
+
+[5] munprotect(0x4000, 3) = 0
+      parent wrote and read back 407
+      child write of 507 to 0x4000: SUCCEEDED
+
+vmdemo done; the shell is still running.
+$ vmtest
+vmtest: ok   allocate an aligned page
+vmtest: ok   writable control store/load
+vmtest: ok   mprotect one page returns 0
+vmtest: ok   protected page is still readable
+vmtest: child writing 0x5000 (a fault is expected if protected)
+pid 9 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0x5000--kill proc
+vmtest: ok   write to protected page faults in child
+vmtest: ok   parent value unchanged after child fault
+vmtest: ok   munprotect one page returns 0
+vmtest: ok   write after munprotect succeeds
+vmtest: child writing 0x5000 (a fault is expected if protected)
+vmtest: ok   child write to unprotected page succeeds
+pid 11 vmtest: trap 14 err 7 on cpu 0 eip 0xaec addr 0x6000--kill proc
+vmtest: ok   mprotect takes effect immediately (TLB refreshed)
+vmtest: ok   mprotect twice returns 0
+vmtest: child writing 0x7000 (a fault is expected if protected)
+pid 12 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0x7000--kill proc
+vmtest: ok   still protected after repeated mprotect
+vmtest: ok   munprotect twice returns 0
+vmtest: child writing 0x7000 (a fault is expected if protected)
+vmtest: ok   writable after repeated munprotect
+vmtest: ok   parent write after repeated munprotect
+vmtest: ok   mprotect three pages returns 0
+vmtest: child writing 0x9064 (a fault is expected if protected)
+pid 14 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0x9064--kill proc
+vmtest: child writing 0xA064 (a fault is expected if protected)
+pid 15 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xa064--kill proc
+vmtest: child writing 0xB064 (a fault is expected if protected)
+pid 16 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xb064--kill proc
+vmtest: ok   every page in the range is protected
+vmtest: child writing 0x8000 (a fault is expected if protected)
+vmtest: ok   page before the range still writable
+vmtest: child writing 0xC000 (a fault is expected if protected)
+vmtest: ok   page after the range still writable
+vmtest: ok   protected pages still readable
+vmtest: ok   munprotect three pages returns 0
+vmtest: ok   all three pages writable again
+vmtest: ok   protect page before fork
+vmtest: child writing 0xD000 (a fault is expected if protected)
+pid 19 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xd000--kill proc
+vmtest: ok   fork child inherits protection
+vmtest: ok   child can munprotect and write its copy
+vmtest: ok   parent copy not changed by child
+vmtest: child writing 0xD000 (a fault is expected if protected)
+pid 21 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xd000--kill proc
+vmtest: ok   parent page still protected after child munprotect
+vmtest: ok   parent munprotects
+vmtest: ok   parent writable after child mprotect
+vmtest: ok   unaligned address rejected
+vmtest: ok   unaligned munprotect rejected
+vmtest: ok   zero length rejected
+vmtest: ok   negative length rejected
+vmtest: ok   overflowing length rejected
+vmtest: ok   wrapping address rejected
+vmtest: ok   page past the heap end rejected
+vmtest: ok   kernel address rejected
+vmtest: ok   kernel munprotect rejected
+vmtest: ok   stack guard page rejected
+vmtest: ok   stack guard page munprotect rejected
+vmtest: ok   range running past the heap end rejected
+vmtest: child writing 0xE000 (a fault is expected if protected)
+vmtest: child writing 0xF000 (a fault is expected if protected)
+vmtest: ok   earlier pages left writable after rejected range
+vmtest: ok   range ending in the guard page rejected
+vmtest: child writing 0x2000 (a fault is expected if protected)
+vmtest: ok   page before the guard left writable after rejected range
+vmtest: ok   munprotect range past the heap end rejected
+vmtest: child writing 0xE000 (a fault is expected if protected)
+pid 26 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xe000--kill proc
+vmtest: child writing 0xF000 (a fault is expected if protected)
+pid 27 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xf000--kill proc
+vmtest: ok   earlier pages left protected after rejected munprotect
+vmtest: ok   valid range still works afterwards
+vmtest: ok   allocate two aligned pages
+vmtest: ok   protect first page for kernel-buffer tests
+vmtest: ok   create pipe
+vmtest: ok   fill pipe
+vmtest: ok   read() into protected page rejected
+vmtest: ok   protected page not modified by read()
+vmtest: ok   switch protection to second page
+vmtest: ok   read() spanning writable then protected page rejected
+vmtest: ok   neither page modified
+vmtest: ok   read() into writable page still works
+vmtest: ok   protect first page again
+vmtest: protected bytes via write(): xy
+vmtest: ok   write() from protected page allowed
+vmtest: ok   open vmtest for fstat
+vmtest: ok   fstat() into protected page rejected
+vmtest: ok   fstat() into writable buffer works
+vmtest: ok   pipe() into protected page rejected
+vmtest: ok   protected page unchanged
+vmtest: ok   unprotect both pages
+vmtest: 10 child write faults observed
+vmtest: ALL PASSED
+$ echo SHELL_STILL_ALIVE
+SHELL_STILL_ALIVE
+$ 
