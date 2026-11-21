@@ -19,6 +19,11 @@ done
 node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 18 ? 0 : 1)' \
   || { echo "Node 18 or newer is required." >&2; exit 1; }
 
+if node -e 'process.exit(Number(process.versions.node.split(".")[0]) > 22 ? 0 : 1)'; then
+  echo "WARNING: Node $(node --version) is newer than 22. The engine's 'canvas' package has no" >&2
+  echo "prebuilt download for it and the install can fail. Use Node 22:  nvm install 22 && nvm use 22" >&2
+fi
+
 if [[ ! -f "$ENGINE/render-cli.ts" ]]; then
   echo "Installing the rendering engine into $ENGINE (one time)..."
   git clone https://github.com/kuncevichandrew2/repotutor.git "$ENGINE"

@@ -19,7 +19,9 @@ an assistant (point it at `docs/HANDOVER.md`).
 
 ## Render it (Mac or Pop!_OS)
 
-Prerequisites: Node 18+, FFmpeg with libmp3lame, Git, Python 3, internet access.
+Prerequisites: **Node 18 to 22 (Node 22 recommended)**, FFmpeg with libmp3lame,
+Git, Python 3, internet access. Newer Node versions (such as 26) can fail while
+installing the engine's `canvas` package; with nvm run `nvm install 22 && nvm use 22`.
 
 ```bash
 # Pop!_OS / Ubuntu
@@ -82,6 +84,7 @@ in `build_inputs.py`; the check will tell you if you forget.
 | --- | --- |
 | `Chromium not found` | `cd ~/.repo2video && npx remotion browser ensure` |
 | Silent video | The Edge TTS voice could not connect; check the network and rerun |
+| `npm error ... node_modules/canvas ... pixman-1 was not found` | Node is too new: `nvm install 22 && nvm use 22`, then `rm -rf ~/.repo2video` and rerun. Alternative: `sudo apt install build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev` |
 | `Cannot find module` | `cd ~/.repo2video && npm install` |
 | Slides show only plain titles | Remotion failed and the engine used its simple FFmpeg fallback; read the warning near the top of the output |
 | Narration over 30 minutes | Slow voice: set `EDGE_TTS_VOICE` to a faster one or shorten narration in `build_inputs.py` |
