@@ -30,9 +30,11 @@ from pygments.lexers import TextLexer, get_lexer_for_filename
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "video" / "out"
 BUILD = Path(os.environ.get("VIDEO_BUILD", "/tmp/viva_build"))
-VOICE = os.environ.get("VOICE", "mb-us2")          # falls back to en-us if mbrola is missing
+VOICE = os.environ.get("VOICE", "rh:slt")           # rh:<name> = RHVoice (slt, clb, bdl, alan); otherwise an espeak-ng voice
 SPEED = os.environ.get("SPEED", "150")
-GAP = 0.35                                          # seconds of silence after each sentence
+GAP = 0.45                                          # seconds of silence after each sentence
+SR = 48000                                          # sample rate used for all audio
+TARGET_DB = -20.0                                   # every sentence is levelled to this mean volume
 
 LONG = "--long" in sys.argv
 CHAPTERS = ["Problem", "Background", "Solution", "Tests & demo", "Modify it", "Viva Q&A", "Live proof"]
@@ -850,24 +852,84 @@ def run(cmd, **kw):
     return subprocess.run(cmd, check=True, capture_output=True, **kw)
 
 
+def synth(text, voice, raw):
+    """Write the speech for text to the wav file raw, using the chosen voice."""
+    if voice.startswith("rh:") and shutil.which("RHVoice-test"):
+        subprocess.run(["RHVoice-test", "-p", voice[3:], "-o", str(raw)], input=text.encode(),
+                       check=True, capture_output=True)
+        return
+    ev = voice[3:] if voice.startswith("rh:") else voice
+    ev = "mb-us2" if voice.startswith("rh:") else ev
+    try:
+        run(["espeak-ng", "-v", ev, "-s", SPEED, "-w", str(raw), text])
+    except subprocess.CalledProcessError:
+        run(["espeak-ng", "-v", "en-us", "-s", SPEED, "-w", str(raw), text])
+
+
+def mean_db(path):
+    out = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
+                         capture_output=True, text=True).stderr
+    m = re.search(r"mean_volume: (-?[\d.]+)", out)
+    return float(m.group(1)) if m else TARGET_DB
+
+
+def clean_sentence(raw, wav, gap=GAP):
+    """Trim stray silence, fade the edges (no clicks), level to TARGET_DB, resample, add the pause."""
+    tmp = Path(str(wav) + ".trim.wav")
+    trim = ("silenceremove=start_periods=1:start_threshold=-48dB:start_silence=0.03,"
+            "areverse,silenceremove=start_periods=1:start_threshold=-48dB:start_silence=0.06,"
+            "afade=t=in:d=0.05,areverse,afade=t=in:d=0.015")
+    run(["ffmpeg", "-y", "-i", str(raw), "-af", trim, "-ar", str(SR), "-ac", "1", "-c:a", "pcm_s16le", str(tmp)])
+    gain = max(-12.0, min(12.0, TARGET_DB - mean_db(tmp)))
+    run(["ffmpeg", "-y", "-i", str(tmp), "-af",
+         f"volume={gain:.2f}dB,alimiter=limit=0.89:attack=3:release=40,apad=pad_dur={gap}",
+         "-c:a", "pcm_s16le", str(wav)])
+    tmp.unlink()
+
+
 def make_audio(i, st):
     wav = BUILD / f"a{i:03d}.wav"
     raw = BUILD / f"r{i:03d}.wav"
     if st["silence"]:
-        run(["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono", "-t", str(st["silence"]),
+        run(["ffmpeg", "-y", "-f", "lavfi", "-i", f"anullsrc=r={SR}:cl=mono", "-t", str(st["silence"]),
              "-c:a", "pcm_s16le", str(wav)])
     else:
-        text = spoken(st["say"] or st["text"])
-        voice = VOICE
-        try:
-            run(["espeak-ng", "-v", voice, "-s", SPEED, "-w", str(raw), text])
-        except subprocess.CalledProcessError:
-            run(["espeak-ng", "-v", "en-us", "-s", SPEED, "-w", str(raw), text])
-        run(["ffmpeg", "-y", "-i", str(raw), "-ar", "44100", "-ac", "1",
-             "-af", f"apad=pad_dur={GAP}", "-c:a", "pcm_s16le", str(wav)])
+        synth(spoken(st["say"] or st["text"]), VOICE, raw)
+        clean_sentence(raw, wav)
         raw.unlink()
     with wave.open(str(wav)) as w:
         return w.getnframes() / w.getframerate()
+
+
+# the chain applied to the whole narration track: gentle EQ and compression for clarity, final loudness
+# normalisation, and a very quiet room-tone bed so pauses are not dead digital silence
+MASTER = ("[1:a]highpass=f=65,equalizer=f=2800:t=q:w=1.0:g=1.2,"
+          "acompressor=threshold=0.1:ratio=2.2:attack=8:release=160:makeup=1.2,"
+          "loudnorm=I=-16:TP=-1.5:LRA=8[v];"
+          f"anoisesrc=c=pink:a=0.0007:r={SR}[n];"
+          "[v][n]amix=inputs=2:duration=first:normalize=0:weights='1 1'[a]")
+
+
+def voice_samples():
+    """Make one short sample per voice so you can choose: video/out/voice_samples.mp3"""
+    OUT.mkdir(parents=True, exist_ok=True)
+    BUILD.mkdir(parents=True, exist_ok=True)
+    line = ("Now the heart of the project, set u v m write, in vm dot c. It validates the whole range first, "
+            "then changes only the writable bit, and reloads C R 3 to flush the T L B.")
+    parts = []
+    for n, v in enumerate(["rh:slt", "rh:clb", "rh:bdl", "rh:alan", "mb-us2"], 1):
+        raw = BUILD / f"vs{n}.raw.wav"
+        wav = BUILD / f"vs{n}.wav"
+        name = "the old voice" if v == "mb-us2" else v[3:]
+        synth(f"Voice {n}, {name}. {line}", v, raw)
+        clean_sentence(raw, wav, gap=0.9)
+        raw.unlink()
+        parts.append(wav)
+    (BUILD / "vs.txt").write_text("".join(f"file '{p.name}'\n" for p in parts))
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(BUILD / "vs.txt"), "-c", "copy", str(BUILD / "vs.wav")])
+    run(["ffmpeg", "-y", "-i", str(BUILD / "vs.wav"), "-af", "loudnorm=I=-16:TP=-1.5", "-c:a", "libmp3lame",
+         "-b:a", "96k", str(OUT / "voice_samples.mp3")])
+    print("wrote", OUT / "voice_samples.mp3")
 
 
 def fmt(t):
@@ -875,6 +937,9 @@ def fmt(t):
 
 
 def main():
+    if "--voices" in sys.argv:
+        voice_samples()
+        return
     frames_only = "--frames" in sys.argv
     shutil.rmtree(BUILD, ignore_errors=True)
     BUILD.mkdir(parents=True)
@@ -934,7 +999,8 @@ const { chromium } = require('playwright'); const fs = require('fs'); const path
          "-tune", "stillimage", str(BUILD / "video.mp4")])
     out = OUT / ("viva_full.mp4" if LONG else "viva.mp4")
     run(["ffmpeg", "-y", "-i", str(BUILD / "video.mp4"), "-i", str(BUILD / "full.wav"),
-         "-af", "highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=11", "-c:v", "copy", "-c:a", "aac", "-b:a", "64k", "-ac", "1",
+         "-filter_complex", MASTER, "-map", "0:v", "-map", "[a]", "-c:v", "copy",
+         "-c:a", "aac", "-b:a", "96k", "-ar", str(SR), "-ac", "1",
          "-shortest", "-movflags", "+faststart", str(out)])
 
     # chapter timestamps and readable script

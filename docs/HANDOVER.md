@@ -15,9 +15,9 @@ coursework, email drafts) never belong in this repository.
 - **Branch:** `main` is the up-to-date branch; study and demo from it. The
   working branch `claude/hopeful-hamilton-x2oed7` was fast-forwarded into
   `main` on 15 November 2026, so the commit hashes below are the same on both.
-- **Viva videos:** `video/viva_full.mp4` (21:38, everything incl. a live-proof
-  chapter) and `video/viva.mp4` (11:17 summary) are built and committed. It is made by `video/make_video.py` (HTML slides drawn with
-  Playwright, real code and real guest output, offline espeak-ng voice, FFmpeg).
+- **Viva videos:** `video/viva_full.mp4` (20:45, everything incl. a live-proof
+  chapter) and `video/viva.mp4` (10:59 summary) are built and committed. It is made by `video/make_video.py` (HTML slides drawn with
+  Playwright, real code and real guest output, offline RHVoice voice, FFmpeg; audio levelled, trimmed and mastered).
   An earlier attempt with the repo2video skill was dropped: it needs online
   services and silently produced a silent, plain video. See `video/README.md`.
 - **Phase now:** the student is preparing for the demo and viva. The deadline
@@ -110,3 +110,6 @@ Key files: `vm.c` (`setuvmwrite`, `checkuvmwrite`, `copyout`), `sysproc.c`
 - **21 Nov 2026:** short viva video built (`video/make_video.py`, `video/viva.mp4`,
   11:17). Checked in the container: audio track present at about -17 dB, audio and
   video lengths equal, frames inspected. The first repo2video attempt was removed.
+- **22 Nov 2026:** audio rebuilt: RHVoice `slt` (24 kHz) instead of espeak/mbrola
+  (16 kHz), per-sentence trimming, fades and levelling, mastering, 48 kHz AAC 96 kbps.
+  Voice samples via `make_video.py --voices`; choose with `VOICE=rh:<name>`.

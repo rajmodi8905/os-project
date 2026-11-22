@@ -15,7 +15,7 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - Reads must still work, but a write to a protected page must kill that process, and only that process.
 - A failed call must change nothing. The change must be immediate. And fork must keep the protection.
 
-## 0:54  Background
+## 0:52  Background
 
 - Background. A page is four thousand ninety-six bytes, and a thirty-two bit address splits into three fields.
 - The top ten bits index the page directory.
@@ -35,7 +35,7 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - Decode the message: error seven is one for present, two for write, and four for user mode. That is our protection firing.
 - A fault from kernel mode is different. The branch above calls panic, and the whole machine stops.
 
-## 2:34  Solution
+## 2:30  Solution
 
 - Our solution in one picture. The program calls mprotect.
 - A tiny assembly stub traps into the kernel, and the dispatch table finds sys mprotect.
@@ -72,7 +72,7 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - In sys read, argptr became argptrw. sys fstat and sys pipe changed the same way, but sys write is untouched.
 - copyout writes through the kernel's own always-writable mapping, so it got the same check.
 
-## 6:16  Tests & demo
+## 6:07  Tests & demo
 
 - To test this from user code, vmtest uses a child process, because a faulting write kills only its own process.
 - The child writes, and only if the write succeeds does it write a marker byte into a pipe.
@@ -88,7 +88,7 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - The full check prints three pass lines. It passed in a Linux container, in GitHub Actions, and on your Pop O S laptop. The ten faults vmtest counted match ten kernel messages.
 - We also broke the code on purpose. Deleting the CR3 reload, or merging the two passes, made tests fail. The Mac has passed only the baseline so far, so run check there first.
 
-## 7:56  Modify it
+## 7:42  Modify it
 
 - Part four. The examiner may ask you to change the code. The method is always the same.
 - Name the files and the function. Make the smallest change. Rebuild and test. Then explain why it works.
@@ -101,7 +101,7 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - Other likely requests: kill the caller instead of returning an error, refuse page zero, cap the length, or return how many pages changed. For each, name the file, the line and the test.
 - Predict before you run: deleting lcr3 fails the immediate-effect test. Merging the passes leaves a page read-only after a rejection. Dropping the user check accepts the guard page. And argptr in sys read panics the kernel.
 
-## 9:35  Viva Q&A
+## 9:18  Viva Q&A
 
 - Now rapid-fire viva questions. Answer each one aloud before you listen to the answer.
 - Why must the address be page-aligned, and the length in pages?
