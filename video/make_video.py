@@ -32,7 +32,8 @@ OUT = ROOT / "video" / "out"
 BUILD = Path(os.environ.get("VIDEO_BUILD", "/tmp/viva_build"))
 VOICE = os.environ.get("VOICE", "rh:slt")           # rh:<name> = RHVoice (slt, clb, bdl, alan); otherwise an espeak-ng voice
 SPEED = os.environ.get("SPEED", "150")
-GAP = 0.45                                          # seconds of silence after each sentence
+GAP = 0.28                                          # seconds of silence after each sentence
+RATE = os.environ.get("RATE", "85")                 # RHVoice speaking rate in percent (100 = its default, which is fast)
 SR = 48000                                          # sample rate used for all audio
 TARGET_DB = -20.0                                   # every sentence is levelled to this mean volume
 
@@ -517,19 +518,6 @@ RW = [
 S(2, bullets("Rewrite setuvmwrite from memory", RW, 5, dim_prev=False),
   "A good test of ownership: close the video and rewrite setuvmwrite from these five steps. Reject bad arguments. Compare counts. Validate every page. Change only the write bit. Then reload CR3.", long=True)
 
-
-# ---- chapter 3: tests and demo
-S(3, code_view("vmtest.c", (41, 60), (48, 58), ours=(1, 400), note="<p>A child does the risky write, so a fault kills the child, not the test.</p>", head="vmtest.c"),
-  "To test this from user code, vmtest uses a child process, because a faulting write kills only its own process.")
-S(3, code_view("vmtest.c", (41, 60), (57, 58), ours=(1, 400), note="<p>The marker is written <b>only if</b> the store succeeded.</p>", head="The marker"),
-  "The child writes, and only if the write succeeds does it write a marker byte into a pipe.")
-S(3, code_view("vmtest.c", (49, 68), (62, 67), ours=(1, 400), note="<p>EOF on the pipe means the child died before the marker, so the write faulted. xv6's <code>wait()</code> has no exit status, hence the pipe.</p>", head="Detecting the fault"),
-  "The parent reads the pipe. End of file means the child died before the marker, so the write faulted.")
-S(3, code_view("vmtest.c", (92, 111), (101, 104), ours=(1, 400), note="<p>The first write caches a writable TLB entry. <code>mprotect</code> then <code>write</code> again, with no context switch.</p>", head="The TLB test"),
-  "One test deserves special mention. The child writes the page first, caching a writable translation, then calls mprotect and writes again.")
-S(3, code_view("vmtest.c", (92, 111), (103, 104), ours=(1, 400), note="<p>No <code>lcr3</code> → the second write succeeds → the marker arrives → test fails. We deleted the line to prove it.</p>", head="Why it matters"),
-  "Without the CR3 reload, that second write would succeed. We proved it by deleting the line: this test failed. Then we restored it.")
-
 TR = [
     "<code>mprotect(p, 2)</code> declared in <code>user.h</code>",
     "<code>usys.S</code> stub: <code>eax = 22</code>, <code>int T_SYSCALL</code>",
@@ -546,6 +534,20 @@ for k in range(1, 7):
        "That slot is sys mprotect in sysproc.c, which calls change protection with writable equals zero.",
        "Which calls setuvmwrite in vm.c: validate, clear the write bit, and reload CR3.",
        "The result goes back in EAX, and that is what the program sees."][k - 1], long=True)
+
+
+
+# ---- chapter 3: tests and demo
+S(3, code_view("vmtest.c", (41, 60), (48, 58), ours=(1, 400), note="<p>A child does the risky write, so a fault kills the child, not the test.</p>", head="vmtest.c"),
+  "To test this from user code, vmtest uses a child process, because a faulting write kills only its own process.")
+S(3, code_view("vmtest.c", (41, 60), (57, 58), ours=(1, 400), note="<p>The marker is written <b>only if</b> the store succeeded.</p>", head="The marker"),
+  "The child writes, and only if the write succeeds does it write a marker byte into a pipe.")
+S(3, code_view("vmtest.c", (49, 68), (62, 67), ours=(1, 400), note="<p>EOF on the pipe means the child died before the marker, so the write faulted. xv6's <code>wait()</code> has no exit status, hence the pipe.</p>", head="Detecting the fault"),
+  "The parent reads the pipe. End of file means the child died before the marker, so the write faulted.")
+S(3, code_view("vmtest.c", (92, 111), (101, 104), ours=(1, 400), note="<p>The first write caches a writable TLB entry. <code>mprotect</code> then <code>write</code> again, with no context switch.</p>", head="The TLB test"),
+  "One test deserves special mention. The child writes the page first, caching a writable translation, then calls mprotect and writes again.")
+S(3, code_view("vmtest.c", (92, 111), (103, 104), ours=(1, 400), note="<p>No <code>lcr3</code> → the second write succeeds → the marker arrives → test fails. We deleted the line to prove it.</p>", head="Why it matters"),
+  "Without the CR3 reload, that second write would succeed. We proved it by deleting the line: this test failed. Then we restored it.")
 
 # ---- long only: the full vmtest tour (chapter 3)
 V = (1, 400)
@@ -855,7 +857,7 @@ def run(cmd, **kw):
 def synth(text, voice, raw):
     """Write the speech for text to the wav file raw, using the chosen voice."""
     if voice.startswith("rh:") and shutil.which("RHVoice-test"):
-        subprocess.run(["RHVoice-test", "-p", voice[3:], "-o", str(raw)], input=text.encode(),
+        subprocess.run(["RHVoice-test", "-p", voice[3:], "-r", RATE, "-o", str(raw)], input=text.encode(),
                        check=True, capture_output=True)
         return
     ev = voice[3:] if voice.startswith("rh:") else voice
@@ -878,7 +880,7 @@ def clean_sentence(raw, wav, gap=GAP):
     tmp = Path(str(wav) + ".trim.wav")
     trim = ("silenceremove=start_periods=1:start_threshold=-48dB:start_silence=0.03,"
             "areverse,silenceremove=start_periods=1:start_threshold=-48dB:start_silence=0.06,"
-            "afade=t=in:d=0.05,areverse,afade=t=in:d=0.015")
+            "afade=t=in:d=0.025,areverse,afade=t=in:d=0.015")
     run(["ffmpeg", "-y", "-i", str(raw), "-af", trim, "-ar", str(SR), "-ac", "1", "-c:a", "pcm_s16le", str(tmp)])
     gain = max(-12.0, min(12.0, TARGET_DB - mean_db(tmp)))
     run(["ffmpeg", "-y", "-i", str(tmp), "-af",
@@ -995,13 +997,17 @@ const { chromium } = require('playwright'); const fs = require('fs'); const path
     lines.append(f"file 's{n - 1:03d}.png'\n")
     (BUILD / "images.txt").write_text("".join(lines))
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(BUILD / "images.txt"),
-         "-vf", "fps=10,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
-         "-tune", "stillimage", str(BUILD / "video.mp4")])
+         "-vf", "fps=25,format=yuv420p", "-c:v", "libx264", "-preset", "medium", "-crf", "31",
+         "-tune", "stillimage", "-profile:v", "high", "-level", "4.1", "-g", "100", "-keyint_min", "100",
+         "-sc_threshold", "0", str(BUILD / "video.mp4")])
     out = OUT / ("viva_full.mp4" if LONG else "viva.mp4")
     run(["ffmpeg", "-y", "-i", str(BUILD / "video.mp4"), "-i", str(BUILD / "full.wav"),
          "-filter_complex", MASTER, "-map", "0:v", "-map", "[a]", "-c:v", "copy",
-         "-c:a", "aac", "-b:a", "96k", "-ar", str(SR), "-ac", "1",
+         "-c:a", "aac", "-b:a", "128k", "-ar", str(SR), "-ac", "1",
          "-shortest", "-movflags", "+faststart", str(out)])
+
+    # audio-only copy: handy to tell a player problem from an audio problem
+    run(["ffmpeg", "-y", "-i", str(out), "-vn", "-c:a", "libmp3lame", "-b:a", "96k", str(out.with_name(out.stem + "_audio.mp3"))])
 
     # chapter timestamps and readable script
     md = ["# Narration script and chapter times" + (" (full 30-minute version)" if LONG else "") + "\n"]

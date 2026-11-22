@@ -15,8 +15,8 @@ coursework, email drafts) never belong in this repository.
 - **Branch:** `main` is the up-to-date branch; study and demo from it. The
   working branch `claude/hopeful-hamilton-x2oed7` was fast-forwarded into
   `main` on 15 November 2026, so the commit hashes below are the same on both.
-- **Viva videos:** `video/viva_full.mp4` (20:45, everything incl. a live-proof
-  chapter) and `video/viva.mp4` (10:59 summary) are built and committed. It is made by `video/make_video.py` (HTML slides drawn with
+- **Viva videos:** `video/viva_full.mp4` (23:35, everything incl. a live-proof
+  chapter) and `video/viva.mp4` (12:23 summary) are built and committed. It is made by `video/make_video.py` (HTML slides drawn with
   Playwright, real code and real guest output, offline RHVoice voice, FFmpeg; audio levelled, trimmed and mastered).
   An earlier attempt with the repo2video skill was dropped: it needs online
   services and silently produced a silent, plain video. See `video/README.md`.
@@ -113,3 +113,8 @@ Key files: `vm.c` (`setuvmwrite`, `checkuvmwrite`, `copyout`), `sysproc.c`
 - **22 Nov 2026:** audio rebuilt: RHVoice `slt` (24 kHz) instead of espeak/mbrola
   (16 kHz), per-sentence trimming, fades and levelling, mastering, 48 kHz AAC 96 kbps.
   Voice samples via `make_video.py --voices`; choose with `VOICE=rh:<name>`.
+- **22 Nov 2026:** user reported the audio breaking up. Analysis found no clicks, dropouts or
+  empty clips, but the voice was very fast (about 215 wpm) and the video was 10 fps with 10 s
+  keyframes. Now: RHVoice rate 85, 0.28 s pauses, 25 fps H.264 with 4 s keyframes, 128 kbps
+  audio, and an audio-only mp3 to separate player problems from audio problems. Also fixed the
+  end-to-end trace scene, which sat in the wrong chapter in the full video.

@@ -16,7 +16,7 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - Reads must still work, but a write to a protected page must kill that process, and only that process.
 - A failed call must change nothing. The change must be immediate. And fork must keep the protection.
 
-## 1:03  Background
+## 1:11  Background
 
 - Background. A page is four thousand ninety-six bytes, and a thirty-two bit address splits into three fields.
 - The top ten bits index the page directory.
@@ -36,7 +36,7 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - Decode the message: error seven is one for present, two for write, and four for user mode. That is our protection firing.
 - A fault from kernel mode is different. The branch above calls panic, and the whole machine stops.
 
-## 2:40  Solution
+## 3:01  Solution
 
 - Our solution in one picture. The program calls mprotect.
 - A tiny assembly stub traps into the kernel, and the dispatch table finds sys mprotect.
@@ -78,17 +78,6 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - Two existing pieces you must know. walkpgdir finds the directory entry, then the page table, and returns a pointer to the PTE. With alloc zero it gives up instead of building a page table, which both our helpers rely on.
 - And exec allocates two pages and clears the user bit on the lower one. That is the guard page, and our validation rejects any page without the user bit.
 - A good test of ownership: close the video and rewrite setuvmwrite from these five steps. Reject bad arguments. Compare counts. Validate every page. Change only the write bit. Then reload CR3.
-
-## 7:22  Tests & demo
-
-- To test this from user code, vmtest uses a child process, because a faulting write kills only its own process.
-- The child writes, and only if the write succeeds does it write a marker byte into a pipe.
-- The parent reads the pipe. End of file means the child died before the marker, so the write faulted.
-- One test deserves special mention. The child writes the page first, caching a writable translation, then calls mprotect and writes again.
-- Without the CR3 reload, that second write would succeed. We proved it by deleting the line: this test failed. Then we restored it.
-
-## 2:40  Solution
-
 - A very likely question: walk me from mprotect in C to the page table entry, naming every file. In the program, mprotect is declared in user.h.
 - The stub in usys.S puts twenty-two in EAX and executes int T underscore SYSCALL.
 - The trap handler calls syscall, which looks up slot twenty-two in the table in syscall.c.
@@ -96,8 +85,13 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - Which calls setuvmwrite in vm.c: validate, clear the write bit, and reload CR3.
 - The result goes back in EAX, and that is what the program sees.
 
-## 7:22  Tests & demo
+## 9:07  Tests & demo
 
+- To test this from user code, vmtest uses a child process, because a faulting write kills only its own process.
+- The child writes, and only if the write succeeds does it write a marker byte into a pipe.
+- The parent reads the pipe. End of file means the child died before the marker, so the write faulted.
+- One test deserves special mention. The child writes the page first, caching a writable translation, then calls mprotect and writes again.
+- Without the CR3 reload, that second write would succeed. We proved it by deleting the line: this test failed. Then we restored it.
 - Now vmtest.c from top to bottom. check prints ok or FAIL and counts failures. The faults counter counts children stopped by a fault, and the runner compares it with the kernel.
 - allocpages grows the heap with sbrk, rounds up to a page boundary, and returns whole fresh pages, so a test never protects the stack or malloc's own data.
 - The repeated test calls mprotect twice, then munprotect twice. Doing the same thing again must be harmless.
@@ -128,7 +122,7 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - scripts slash x v 6 is the command you type: build, run, smoke, check, and clean. Check runs the whole sequence including the original tests.
 - And GitHub Actions runs the same check on every push, so the evidence is repeatable and not just on your laptop.
 
-## 12:39  Live proof
+## 14:25  Live proof
 
 - Now the part most people forget: how to prove it live. The day before, charge the laptop and test it on the presentation machine. Pull the latest code, run clean and then check, and expect three pass lines. Close other QEMU windows, and keep a recording as a backup.
 - Start by showing the work. git log shows each checkpoint as a commit, from the syscalls to the tests, the demo and the documentation.
@@ -148,7 +142,7 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - If something goes wrong: a hang means another QEMU is running, so close it and clean. Not found means an old disk image, so clean and run again. A slow Mac is normal. Control A then X leaves QEMU. And if all fails, play your backup recording.
 - Finally, your opening. Say: I added two system calls that clear or set one bit on a range of pages. The hardware enforces it. I validate first, change second, then flush the TLB, and I made the kernel's own writes respect it. Let me show it, and then I can walk through any block.
 
-## 15:48  Modify it
+## 18:02  Modify it
 
 - Part four. The examiner may ask you to change the code. The method is always the same.
 - Name the files and the function. Make the smallest change. Rebuild and test. Then explain why it works.
@@ -164,7 +158,7 @@ Spoken with a local offline voice; re-record in your own voice if you prefer.
 - Other likely requests: kill the caller instead of returning an error, refuse page zero, cap the length, or return how many pages changed. For each, name the file, the line and the test.
 - Predict before you run: deleting lcr3 fails the immediate-effect test. Merging the passes leaves a page read-only after a rejection. Dropping the user check accepts the guard page. And argptr in sys read panics the kernel.
 
-## 17:51  Viva Q&A
+## 20:23  Viva Q&A
 
 - Now rapid-fire viva questions. Answer each one aloud before you listen to the answer.
 - Why must the address be page-aligned, and the length in pages?
