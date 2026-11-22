@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>xv6 Page Protection Course</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout concept: a datasheet-like reading column beside a sticky module index.
+   The page's one signature is the permission bit: the accent colour is "the W bit",
+   and the header shows one bit per module that flips from 0 to 1 as you finish it. */
+:root{
+  --bg:#EDF1F4; --bg2:#E2E9EE; --surface:#FFFFFF; --ink:#0F1C26; --ink2:#41546A; --mute:#667788; --line:#D2DBE3;
+  --accent:#C25E00; --accent-ink:#8A4200; --accent-soft:#FBE8D3;
+  --ok:#11785A; --ok-soft:#D9F2E8; --bad:#BF332C; --bad-soft:#FADFDC; --info:#2557C8; --info-soft:#DFE8FA;
+  --code-bg:#0F1C26; --code-ink:#E4ECF2; --code-mute:#6F8294; --code-line:#223442; --code-hl:#1D3346;
+  --c-kw:#FF8F85; --c-ty:#F6B36B; --c-fn:#C9A7FF; --c-str:#9CD3FF; --c-num:#7FC4FF; --c-cm:#7D90A1;
+  --font-display:'Space Grotesk','Inter',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  --header-h:64px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1319; --bg2:#101B23; --surface:#131E27; --ink:#E6EDF2; --ink2:#AEBFCD; --mute:#8497A7; --line:#25353F;
+    --accent:#F2A24A; --accent-ink:#F7BE7E; --accent-soft:#33260F;
+    --ok:#3FCB9C; --ok-soft:#10322A; --bad:#FF7168; --bad-soft:#3A1816; --info:#86A8FF; --info-soft:#17264A;
+    --code-bg:#0A1117; --code-line:#1D2C37; --code-hl:#16293A; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1319; --bg2:#101B23; --surface:#131E27; --ink:#E6EDF2; --ink2:#AEBFCD; --mute:#8497A7; --line:#25353F;
+  --accent:#F2A24A; --accent-ink:#F7BE7E; --accent-soft:#33260F;
+  --ok:#3FCB9C; --ok-soft:#10322A; --bad:#FF7168; --bad-soft:#3A1816; --info:#86A8FF; --info-soft:#17264A;
+  --code-bg:#0A1117; --code-line:#1D2C37; --code-hl:#16293A; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:calc(var(--header-h) + 16px + env(safe-area-inset-top,0px))}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.65 var(--font-body);-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--surface);z-index:30}
+a{color:var(--info)}
+h1,h2,h3{font-family:var(--font-display);line-height:1.15;text-wrap:balance;margin:0}
+h2{font-size:clamp(1.7rem,3.4vw,2.35rem);letter-spacing:-.01em}
+h3{font-size:1.2rem;margin-top:2rem}
+p{margin:.8rem 0;max-width:68ch}
+code,kbd{font-family:var(--font-mono);font-size:.88em}
+p code,li code,td code,.say code,.note code,.card code{background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:.05em .35em}
+:focus-visible{outline:3px solid var(--info);outline-offset:2px;border-radius:4px}
+.btn{font:600 .9rem var(--font-body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.5rem .85rem;cursor:pointer}
+.btn:hover{border-color:var(--ink2)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+:root[data-theme="dark"] .btn.accent{color:#1a1206}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.accent{color:#1a1206}}
+.btn[disabled]{opacity:.45;cursor:default}
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-in{display:flex;align-items:center;gap:1rem;min-height:var(--header-h);padding-block:.5rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1320px;margin:0 auto}
+.brand{display:flex;align-items:baseline;gap:.6rem;min-width:0}
+.logo{font:700 1.05rem var(--font-mono);white-space:nowrap}
+.logo b{color:var(--accent)}
+.bt{font:600 .95rem var(--font-display);color:var(--ink2);white-space:nowrap}
+.reg{display:flex;align-items:center;gap:.7rem;margin-left:auto;min-width:0}
+.bits{display:flex;gap:3px}
+.bit{width:20px;height:24px;border-radius:5px;border:1px solid var(--line);font:600 .72rem/22px var(--font-mono);text-align:center;color:var(--mute);background:var(--bg2)}
+.bit.on{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .bit.on{color:#1a1206}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .bit.on{color:#1a1206}}
+.regtxt{font:500 .8rem var(--font-mono);color:var(--ink2);white-space:nowrap}
+#jump{display:none;font:500 .9rem var(--font-body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.45rem .5rem;max-width:11rem}
+/* shell */
+.shell{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:2.5rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.side{position:sticky;top:calc(var(--header-h) + env(safe-area-inset-top,0px));align-self:start;padding:1.5rem 0;max-height:calc(100vh - var(--header-h));overflow:auto}
+.side h4{font:600 .72rem var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0 0 .8rem}
+.side a{display:flex;gap:.6rem;align-items:baseline;text-decoration:none;color:var(--ink2);padding:.4rem .6rem;border-radius:8px;font-size:.92rem;line-height:1.3}
+.side a:hover{background:var(--bg2)}
+.side a.cur{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.side a .n{font:500 .75rem var(--font-mono);color:var(--mute);width:1.6rem;flex:none}
+.side a .ck{margin-left:auto;font:600 .8rem var(--font-mono);color:var(--mute)}
+.side a.done .ck{color:var(--ok)}
+main{min-width:0;padding-bottom:6rem}
+/* hero */
+.hero{padding:3rem 0 2rem}
+.hero .kick{font:600 .75rem var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink)}
+.hero h1{font-size:clamp(2.2rem,5.4vw,3.8rem);letter-spacing:-.02em;margin:.7rem 0 1rem;max-width:18ch}
+.hero .lede{font-size:1.2rem;color:var(--ink2);max-width:60ch}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:1rem;margin:1.5rem 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.25rem;min-width:0}
+.card h4{margin:0 0 .4rem;font:600 1rem var(--font-display)}
+.card p{margin:.3rem 0;font-size:.95rem;color:var(--ink2)}
+.card ul{margin:.3rem 0;padding-left:1.1rem;color:var(--ink2);font-size:.95rem}
+/* modules */
+.module{padding:3.5rem 0 1rem;border-top:1px solid var(--line)}
+.mhead .kick{font:600 .75rem var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink);margin:0 0 .5rem}
+.mhead .meta{font:500 .85rem var(--font-mono);color:var(--mute);margin:.6rem 0 0}
+.mhead .goal{font-size:1.08rem;color:var(--ink2);margin-top:1rem;max-width:62ch}
+.note{background:var(--info-soft);border:1px solid var(--line);border-left:4px solid var(--info);border-radius:10px;padding:.8rem 1.1rem;margin:1.2rem 0;max-width:76ch}
+.note.warn{background:var(--accent-soft);border-left-color:var(--accent)}
+.note.good{background:var(--ok-soft);border-left-color:var(--ok)}
+.note.bad{background:var(--bad-soft);border-left-color:var(--bad)}
+.note p{margin:.3rem 0}
+.note .t{font:600 .72rem var(--font-mono);letter-spacing:.1em;text-transform:uppercase;margin:0 0 .2rem;color:var(--ink2)}
+table{border-collapse:collapse;width:100%;font-size:.93rem}
+.tw{overflow-x:auto;margin:1.2rem 0;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+th,td{text-align:left;padding:.65rem .9rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 .72rem var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mute);background:var(--bg2)}
+tr:last-child td{border-bottom:0}
+/* code */
+.code{margin:1.1rem 0;border-radius:12px;overflow:hidden;background:var(--code-bg);border:1px solid var(--code-line)}
+.code figcaption{font:500 .78rem var(--font-mono);color:var(--code-mute);padding:.55rem 1rem;border-bottom:1px solid var(--code-line)}
+.code pre{margin:0;overflow-x:auto;padding:.7rem 0;font:400 .82rem/1.6 var(--font-mono);color:var(--code-ink)}
+.code code{display:block;min-width:max-content;font-size:inherit}
+.l{display:flex;white-space:pre}
+.l i{width:3.4em;text-align:right;padding-right:1.1em;color:var(--code-mute);font-style:normal;user-select:none;flex:none}
+.l b{font-weight:400;padding-right:1.2em}
+.l.hl{background:var(--code-hl);box-shadow:inset 3px 0 0 var(--accent)}
+.k,.kd,.kr,.kn,.kp{color:var(--c-kw)}.kt{color:var(--c-ty)}.nf{color:var(--c-fn)}.s,.s1,.s2,.sc{color:var(--c-str)}
+.mi,.mh,.m,.mf{color:var(--c-num)}.c1,.cm,.c,.cs{color:var(--c-cm);font-style:italic}.cp,.cpf{color:var(--c-kw)}.o{color:var(--c-kw)}
+.tb{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:1.25rem;align-items:start;margin:1.1rem 0}
+.tb .code{margin:0}
+.say{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1rem 1.2rem}
+.say .t{font:600 .72rem var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);margin:0 0 .4rem}
+.say p{margin:.4rem 0;font-size:.97rem}
+details{margin:1rem 0}
+summary{cursor:pointer;font-weight:600;color:var(--ink);padding:.4rem 0}
+.term{background:var(--code-bg);border:1px solid var(--code-line);border-radius:12px;overflow:hidden}
+.term .bar{display:flex;gap:6px;align-items:center;padding:.55rem .9rem;border-bottom:1px solid var(--code-line);font:500 .78rem var(--font-mono);color:var(--code-mute)}
+.term .bar i{width:11px;height:11px;border-radius:50%;background:var(--code-line);display:inline-block}
+.term pre{margin:0;padding:.9rem 1rem;overflow-x:auto;font:400 .86rem/1.55 var(--font-mono);color:var(--code-ink);min-height:6rem}
+.term .fault{color:#FF8F85;background:rgba(255,113,104,.14)}.term .ok{color:#7EE7B7}.term .stop{color:#F6B36B}.term .cmd{color:#86A8FF;font-weight:600}
+.term .hl{background:var(--code-hl);box-shadow:inset 3px 0 0 var(--accent);display:inline-block;min-width:100%}
+/* simulators */
+.sim{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.2rem 1.3rem;margin:1.4rem 0}
+.sim .st{font:600 .72rem var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);margin:0 0 .2rem}
+.sim h3{margin:.1rem 0 .4rem;font-size:1.15rem}
+.row{display:flex;flex-wrap:wrap;gap:.7rem;align-items:center}
+.sim .row{margin:.8rem 0}
+.sim label{font-size:.92rem;display:inline-flex;gap:.4rem;align-items:center}
+.sim input[type=text],.sim select{font:500 .95rem var(--font-mono);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.5rem .7rem;min-width:0;max-width:100%}
+.sim input[type=text]{width:12rem}
+.out{margin-top:.8rem;min-width:0}
+.segs{display:grid;grid-template-columns:10fr 10fr 12fr;gap:6px;margin:.6rem 0}
+.seg{border:2px solid var(--line);border-radius:10px;padding:.6rem .5rem;text-align:center;background:var(--bg);min-width:0}
+.seg.a{border-color:var(--info);background:var(--info-soft)}.seg.b{border-color:var(--accent);background:var(--accent-soft)}.seg.c{border-color:var(--ok);background:var(--ok-soft)}
+.seg .bin{font:500 .8rem var(--font-mono);word-break:break-all;color:var(--ink)}
+.seg .nm{font:600 .74rem var(--font-mono);color:var(--ink2);margin-top:.3rem}
+.seg .v{font:600 1.1rem var(--font-mono);margin-top:.2rem}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:.2rem 1rem;font-size:.95rem;margin-top:.6rem}
+.kv dt{color:var(--mute);font-family:var(--font-mono);font-size:.82rem}.kv dd{margin:0;font-family:var(--font-mono)}
+.pill{display:inline-block;padding:.1rem .6rem;border-radius:999px;font:600 .78rem var(--font-mono)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.warn{background:var(--accent-soft);color:var(--accent-ink)}.pill.info{background:var(--info-soft);color:var(--info)}
+.pte{display:grid;grid-template-columns:repeat(32,minmax(0,1fr));gap:2px;margin:.8rem 0}
+.pte span{height:30px;border-radius:4px;background:var(--bg2);border:1px solid var(--line);font:600 .68rem/28px var(--font-mono);text-align:center;color:var(--mute);min-width:0}
+.pte span.addr{background:var(--info-soft);color:var(--info)}.pte span.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.pte span.w{outline:2px solid var(--accent);outline-offset:1px}.pte span.w.on{background:var(--accent);border-color:var(--accent)}
+.legend{display:flex;flex-wrap:wrap;gap:.3rem 1rem;font:500 .76rem var(--font-mono);color:var(--mute)}
+.flow{display:flex;flex-wrap:wrap;gap:.6rem;align-items:stretch;margin:.8rem 0}
+.flow .box{flex:1 1 150px;background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:.7rem .8rem;min-width:0}
+.flow .box h5{margin:0 0 .25rem;font:600 .95rem var(--font-display)}
+.flow .box small{display:block;font:500 .78rem var(--font-mono);color:var(--mute)}
+.flow .box.on{border-color:var(--info);background:var(--info-soft)}.flow .box.good{border-color:var(--ok);background:var(--ok-soft)}
+.flow .box.bad{border-color:var(--bad);background:var(--bad-soft)}.flow .box.warn{border-color:var(--accent);background:var(--accent-soft)}
+.flow .box.dim{opacity:.45}
+.flow .ar{align-self:center;color:var(--mute);font-size:1.4rem}
+.verdict{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.8rem 1rem;border-radius:10px;margin-top:.8rem;border:1px solid var(--line);background:var(--bg)}
+.verdict.ok{border-color:var(--ok);background:var(--ok-soft)}.verdict.bad{border-color:var(--bad);background:var(--bad-soft)}.verdict.warn{border-color:var(--accent);background:var(--accent-soft)}
+.pages{display:flex;gap:.5rem;flex-wrap:wrap;margin:.8rem 0}
+.pg{flex:1 1 90px;max-width:140px;border:2px solid var(--line);border-radius:10px;padding:.6rem .4rem;text-align:center;background:var(--bg);font:500 .8rem var(--font-mono);cursor:pointer;color:var(--ink)}
+.pg b{display:block;font:600 .95rem var(--font-mono)}
+.pg.ro{border-color:var(--accent);background:var(--accent-soft)}.pg.inv{border-style:dashed;border-color:var(--bad);background:var(--bad-soft)}
+.pg[aria-pressed=true]{outline:3px solid var(--info);outline-offset:2px}
+.tabs{display:flex;flex-wrap:wrap;gap:.4rem;margin:.8rem 0}
+.tabs button{font:600 .85rem var(--font-body);padding:.5rem .8rem;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink2);cursor:pointer}
+.tabs button[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.stn{display:none}.stn.show{display:block}
+/* quiz */
+.quiz{margin:2.2rem 0 1rem;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.2rem 1.3rem}
+.quiz>h3{margin:0 0 .6rem;font-size:1.05rem}
+.q{margin:1.1rem 0;padding-top:1rem;border-top:1px solid var(--line)}
+.q:first-of-type{border-top:0;padding-top:0}
+.q p.qq{font-weight:600;margin:.2rem 0 .6rem;max-width:none}
+.opts{display:grid;gap:.5rem}
+.opt{display:flex;gap:.7rem;text-align:left;font:500 .95rem var(--font-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:.6rem .85rem;cursor:pointer;min-width:0}
+.opt:hover{border-color:var(--ink2)}
+.opt .lt{font:600 .8rem var(--font-mono);color:var(--mute);flex:none;width:1.2rem}
+.opt.good{background:var(--ok-soft);border-color:var(--ok)}.opt.wrong{background:var(--bad-soft);border-color:var(--bad)}
+.fb{margin-top:.6rem;font-size:.93rem;color:var(--ink2);min-height:1.2rem}
+.fb.good{color:var(--ok)}.fb.wrong{color:var(--bad)}
+.qstat{margin-top:.8rem;font:500 .82rem var(--font-mono);color:var(--mute)}
+/* bug hunt */
+.bug{background:var(--code-bg);border:1px solid var(--code-line);border-radius:12px;padding:.6rem 0;margin:.8rem 0;overflow-x:auto}
+.bug button{display:block;width:100%;text-align:left;font:400 .86rem/1.7 var(--font-mono);color:var(--code-ink);background:none;border:0;padding:0 1rem;cursor:pointer;white-space:pre;min-width:max-content}
+.bug button:hover{background:var(--code-hl)}
+.bug button.good{background:rgba(63,203,156,.2);box-shadow:inset 3px 0 0 var(--ok)}.bug button.wrong{background:rgba(255,113,104,.2);box-shadow:inset 3px 0 0 var(--bad)}
+/* flashcards */
+.fc{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1.5rem;min-height:15rem;display:flex;flex-direction:column;gap:1rem}
+.fc .n{font:600 .75rem var(--font-mono);letter-spacing:.1em;color:var(--mute)}
+.fc .q{font:600 1.35rem/1.3 var(--font-display);margin:0;padding:0;border:0}
+.fc .a{border-left:4px solid var(--ok);padding-left:1rem;color:var(--ink);font-size:1.02rem}
+.fc .bar{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:auto}
+.dots{display:flex;flex-wrap:wrap;gap:4px;margin:.8rem 0}
+.dots i{width:22px;height:8px;border-radius:4px;background:var(--bg2);border:1px solid var(--line)}
+.dots i.got{background:var(--ok);border-color:var(--ok)}.dots i.cur{outline:2px solid var(--info);outline-offset:1px}
+.check{display:flex;gap:.7rem;align-items:flex-start;padding:.5rem 0;border-bottom:1px solid var(--line)}
+.check input{margin-top:.3rem;width:1.1rem;height:1.1rem}
+.ex{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.2rem 1.3rem;margin:1.2rem 0}
+.ex h3{margin:0 0 .4rem;font-size:1.15rem}
+.ex .sol{margin-top:.5rem}
+.done-banner{display:none;background:var(--ok-soft);border:2px solid var(--ok);border-radius:14px;padding:1.2rem 1.4rem;margin:2rem 0}
+.done-banner.show{display:block}
+.done-banner h3{margin:0 0 .3rem}
+footer{border-top:1px solid var(--line);padding:2rem 0 1rem;color:var(--mute);font-size:.88rem}
+@media (max-width:1000px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{display:none}
+  #jump{display:block}
+  .bits .bit:nth-child(n+1){width:14px}
+  .tb{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  :root{--header-h:92px}
+  .bt{display:none}
+  .regtxt{display:none}
+  .top-in{flex-wrap:wrap;gap:.4rem .8rem}
+  .reg{width:100%;margin-left:0;gap:.5rem}
+  .bits{flex:none}.bit{width:11px!important;height:20px;font-size:.6rem;line-height:18px}
+  #jump{flex:1;min-width:0;max-width:none}
+  .btn#theme{padding:.4rem .6rem}
+  .pte span{font-size:.55rem}
+  .sim input[type=text]{width:100%}
+  body{font-size:15.5px}
+}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+</style>
+
+</head>
+<body>
+
+<header class="top"><div class="top-in">
+  <div class="brand"><span class="logo">PTE<b>_W</b></span><span class="bt">xv6 page protection course</span></div>
+  <div class="reg"><div class="bits" id="bits" role="img" aria-label="Course progress"></div><span class="regtxt" id="regtxt"></span>
+    <select id="jump" aria-label="Jump to a module"></select>
+    <button class="btn" id="theme" type="button" aria-label="Switch colour theme">Theme</button></div>
+</div></header>
+
+<div class="shell">
+<nav class="side" aria-label="Modules" id="side"><h4>Modules</h4></nav>
+<main>
+
+<section class="hero" id="top">
+  <p class="kick">A hands-on course</p>
+  <h1>How a program makes its own memory read-only</h1>
+  <p class="lede">You will learn how <code>mprotect()</code> and <code>munprotect()</code> work inside the x86 xv6 kernel, by reading the real code we wrote, poking at working models of it, and rehearsing the questions an examiner will ask.</p>
+  <div class="grid2">
+    <div class="card"><h4>What you will be able to do</h4><ul>
+      <li>Explain how an address becomes a physical page</li>
+      <li>Say exactly which bit makes a page read-only</li>
+      <li>Walk one system call from user code to the page table</li>
+      <li>Rewrite <code>setuvmwrite()</code> from memory</li>
+      <li>Change the code live without help</li></ul></div>
+    <div class="card"><h4>How this course works</h4><ul>
+      <li>11 short modules, about 90 minutes in total</li>
+      <li>Every code block is read from the project files, with line numbers</li>
+      <li>Models you can run: address splitter, PTE bits, TLB, two-pass check, kernel buffers</li>
+      <li>Each module ends with a short check. Finish it to flip its bit above</li>
+      <li>Progress is saved in this browser only</li></ul></div>
+  </div>
+  <div class="note"><p class="t">Before you start</p><p>The project is read-only page protection in x86 xv6, from the OSTEP virtual-memory project. The code lives in the <code>os-project</code> repository on branch <code>main</code>. Green bars on the code mean we added the line; the rest is original xv6.</p></div>
+</section>
+
+<!-- ============ MODULE 1 ============ -->
+<section class="module" id="m1">
+  <div class="mhead"><p class="kick">Module 1 of 11</p><h2>The problem</h2><p class="meta">6 min · requirements table · checkpoint</p>
+    <p class="goal">By the end you can state what the two system calls must do, and the six rules that make this harder than flipping a bit.</p></div>
+  <p>In xv6 a process can read and write every page it owns. We add two system calls so a program can switch the write permission of its own pages off and on.</p>
+  <div class="grid2">
+    <div class="card"><h4><code>int mprotect(void *addr, int len)</code></h4><p>Make <code>len</code> pages, starting at the page-aligned address <code>addr</code>, read-only.</p></div>
+    <div class="card"><h4><code>int munprotect(void *addr, int len)</code></h4><p>Make those pages writable again. Both return <code>0</code> on success and <code>-1</code> on an invalid request.</p></div>
+  </div>
+  <p><code>len</code> counts pages, not bytes. A page on x86 is 4096 bytes.</p>
+  <h3>Six rules, and where each one is handled</h3>
+  <div class="tw"><table>
+    <tr><th>Rule</th><th>What could go wrong</th><th>Handled in</th></tr>
+    <tr><td>Reads still work</td><td>Clearing the wrong bit makes the page unreadable</td><td>Module 3</td></tr>
+    <tr><td>A write kills only that process</td><td>The fault handler stops the whole machine</td><td>Module 4</td></tr>
+    <tr><td>A failed call changes nothing</td><td>The first pages change before a bad page is found</td><td>Module 6</td></tr>
+    <tr><td>The change is immediate</td><td>The CPU keeps a cached, writable copy</td><td>Modules 4 and 6</td></tr>
+    <tr><td>Permissions survive <code>fork()</code></td><td>The child gets a writable copy</td><td>Module 6</td></tr>
+    <tr><td>The kernel cannot be tricked</td><td><code>read()</code> writes into a protected page and crashes the kernel</td><td>Module 7</td></tr>
+  </table></div>
+  <p>Out of scope: null-pointer protection, swapping, copy-on-write and threads.</p>
+  <div class="quiz" data-m="m1"></div>
+</section>
+
+<!-- ============ MODULE 2 ============ -->
+<section class="module" id="m2">
+  <div class="mhead"><p class="kick">Module 2 of 11</p><h2>Addresses and pages</h2><p class="meta">8 min · interactive: address splitter · checkpoint</p>
+    <p class="goal">By the end you can split any 32-bit address into directory index, table index and offset, and say which page it is in.</p></div>
+  <p>A 32-bit virtual address is three fields glued together. The top ten bits pick an entry in the <b>page directory</b>. The next ten bits pick an entry in a <b>page table</b>. The low twelve bits are the <b>offset</b> inside a 4096-byte page.</p>
+  <div class="flow">
+    <div class="box"><h5>CR3</h5><small>physical address of the page directory</small></div><div class="ar">→</div>
+    <div class="box"><h5>Page directory</h5><small>indexed by PDX</small></div><div class="ar">→</div>
+    <div class="box"><h5>Page table</h5><small>indexed by PTX</small></div><div class="ar">→</div>
+    <div class="box good"><h5>PTE</h5><small>physical page + flags</small></div>
+  </div>
+  <div class="sim" id="addr-sim">
+    <p class="st">Try it</p><h3>Address splitter</h3>
+    <p>Type an address in hex, or pick one. The fields update as you type.</p>
+    <div class="row"><label for="addr-in">Address</label><input type="text" id="addr-in" value="0x00404010" spellcheck="false" autocomplete="off">
+      <button class="btn" type="button" data-a="0x00004000">0x4000</button><button class="btn" type="button" data-a="0x00004fff">0x4fff</button>
+      <button class="btn" type="button" data-a="0x00403010">0x403010</button><button class="btn" type="button" data-a="0x80000000">0x80000000</button></div>
+    <div class="out" id="addr-out" aria-live="polite"></div>
+  </div>
+  <p>These are the real macros from <code>mmu.h</code>. <code>PGROUNDDOWN</code> clears the low twelve bits, which is how xv6 finds the start of a page.</p>
+  <figure class="code"><figcaption>mmu.h · lines 73–91</figcaption><pre tabindex="0"><code><span class="l"><i>73</i><b><span class="c1">// page directory index</span></b></span><span class="l hl"><i>74</i><b><span class="cp">#define PDX(va)         (((uint)(va) &gt;&gt; PDXSHIFT) &amp; 0x3FF)</span></b></span><span class="l"><i>75</i><b>&nbsp;</b></span><span class="l"><i>76</i><b><span class="c1">// page table index</span></b></span><span class="l hl"><i>77</i><b><span class="cp">#define PTX(va)         (((uint)(va) &gt;&gt; PTXSHIFT) &amp; 0x3FF)</span></b></span><span class="l"><i>78</i><b>&nbsp;</b></span><span class="l"><i>79</i><b><span class="c1">// construct virtual address from indexes and offset</span></b></span><span class="l"><i>80</i><b><span class="cp">#define PGADDR(d, t, o) ((uint)((d) &lt;&lt; PDXSHIFT | (t) &lt;&lt; PTXSHIFT | (o)))</span></b></span><span class="l"><i>81</i><b>&nbsp;</b></span><span class="l"><i>82</i><b><span class="c1">// Page directory and page table constants.</span></b></span><span class="l"><i>83</i><b><span class="cp">#define NPDENTRIES      1024    </span><span class="c1">// # directory entries per page directory</span></b></span><span class="l"><i>84</i><b><span class="cp">#define NPTENTRIES      1024    </span><span class="c1">// # PTEs per page table</span></b></span><span class="l hl"><i>85</i><b><span class="cp">#define PGSIZE          4096    </span><span class="c1">// bytes mapped by a page</span></b></span><span class="l"><i>86</i><b>&nbsp;</b></span><span class="l"><i>87</i><b><span class="cp">#define PTXSHIFT        12      </span><span class="c1">// offset of PTX in a linear address</span></b></span><span class="l"><i>88</i><b><span class="cp">#define PDXSHIFT        22      </span><span class="c1">// offset of PDX in a linear address</span></b></span><span class="l"><i>89</i><b>&nbsp;</b></span><span class="l hl"><i>90</i><b><span class="cp">#define PGROUNDUP(sz)  (((sz)+PGSIZE-1) &amp; ~(PGSIZE-1))</span></b></span><span class="l hl"><i>91</i><b><span class="cp">#define PGROUNDDOWN(a) (((a)) &amp; ~(PGSIZE-1))</span></b></span></code></pre></figure>
+  <div class="note"><p class="t">Remember</p><p>page number = address / 4096, and offset = address % 4096. An address is <b>page-aligned</b> when its offset is 0. Our helper rejects any other start address.</p></div>
+  <div class="quiz" data-m="m2"></div>
+</section>
+
+<!-- ============ MODULE 3 ============ -->
+<section class="module" id="m3">
+  <div class="mhead"><p class="kick">Module 3 of 11</p><h2>The permission bits</h2><p class="meta">10 min · interactive: PTE lab · checkpoint</p>
+    <p class="goal">By the end you can name the three flags we use, clear only the write bit, and predict what a read or write does.</p></div>
+  <p>A page table entry holds the physical page number in its top 20 bits and permission flags in its low 12. We use three flags: <code>PTE_P</code> (the page is present), <code>PTE_W</code> (writes are allowed) and <code>PTE_U</code> (user mode may touch it).</p>
+  <figure class="code"><figcaption>mmu.h · lines 93–101</figcaption><pre tabindex="0"><code><span class="l"><i>93</i><b><span class="c1">// Page table/directory entry flags.</span></b></span><span class="l hl"><i>94</i><b><span class="cp">#define PTE_P           0x001   </span><span class="c1">// Present</span></b></span><span class="l hl"><i>95</i><b><span class="cp">#define PTE_W           0x002   </span><span class="c1">// Writeable</span></b></span><span class="l hl"><i>96</i><b><span class="cp">#define PTE_U           0x004   </span><span class="c1">// User</span></b></span><span class="l"><i>97</i><b><span class="cp">#define PTE_PS          0x080   </span><span class="c1">// Page Size</span></b></span><span class="l"><i>98</i><b>&nbsp;</b></span><span class="l"><i>99</i><b><span class="c1">// Address in page table or page directory entry</span></b></span><span class="l hl"><i>100</i><b><span class="cp">#define PTE_ADDR(pte)   ((uint)(pte) &amp; ~0xFFF)</span></b></span><span class="l hl"><i>101</i><b><span class="cp">#define PTE_FLAGS(pte)  ((uint)(pte) &amp;  0xFFF)</span></b></span></code></pre></figure>
+  <div class="sim" id="pte-sim">
+    <p class="st">Try it</p><h3>PTE lab</h3>
+    <p>Use the two buttons, or flip a flag yourself, and watch the table of results.</p>
+    <div class="pte" id="pte-bits" aria-hidden="true"></div>
+    <div class="legend"><span>blue: physical page (fixed at 0x00123)</span><span>green: flag is 1</span><span style="color:var(--accent-ink)">orange outline: the write bit</span></div>
+    <div class="row">
+      <button class="btn accent" type="button" id="pte-mp">mprotect: *pte &amp;= ~PTE_W</button>
+      <button class="btn" type="button" id="pte-mu">munprotect: *pte |= PTE_W</button>
+      <label><input type="checkbox" id="pte-p" checked> PTE_P</label><label><input type="checkbox" id="pte-w" checked> PTE_W</label>
+      <label><input type="checkbox" id="pte-u" checked> PTE_U</label><label><input type="checkbox" id="pte-wp" checked> CR0.WP set</label></div>
+    <div class="kv"><dt>PTE value</dt><dd id="pte-hex"></dd><dt>Last operation</dt><dd id="pte-op">none yet</dd></div>
+    <div class="tw" style="margin-top:1rem"><table><tr><th>Access</th><th>Result</th><th>What the CPU reports</th></tr>
+      <tr><td>User reads the page</td><td id="r-ur"></td><td id="e-ur"></td></tr>
+      <tr><td>User writes the page</td><td id="r-uw"></td><td id="e-uw"></td></tr>
+      <tr><td>Kernel writes the page</td><td id="r-kw"></td><td id="e-kw"></td></tr></table></div>
+  </div>
+  <div class="note warn"><p class="t">Why this matters</p><p>Our whole project is the orange bit. <code>mprotect</code> clears it and <code>munprotect</code> sets it. Every other bit, including the physical page, must stay exactly as it was. That is why we mask with <code>~PTE_W</code> and never assign the whole entry.</p></div>
+  <p>Check the third row with <b>CR0.WP</b> turned off. The kernel would silently write through a read-only page. xv6 sets WP on, so the kernel faults instead. That detail causes a crash in Module 7.</p>
+  <div class="quiz" data-m="m3"></div>
+</section>
+
+<!-- ============ MODULE 4 ============ -->
+<section class="module" id="m4">
+  <div class="mhead"><p class="kick">Module 4 of 11</p><h2>The TLB, write-protect and the fault</h2><p class="meta">10 min · interactive: TLB stepper, error decoder · checkpoint</p>
+    <p class="goal">By the end you can explain why we reload CR3, and decode <code>trap 14 err 7</code> without looking it up.</p></div>
+  <h3>The cache that can lie</h3>
+  <p>Walking two page tables on every memory access is slow, so the CPU caches recent translations, together with their permissions, in the <b>TLB</b>. If we change a PTE, the cached copy can be out of date.</p>
+  <div class="sim" id="tlb-sim">
+    <p class="st">Try it</p><h3>TLB stepper</h3>
+    <div class="row"><label><input type="checkbox" id="tlb-flush" checked> our code reloads CR3 after the change</label>
+      <button class="btn primary" type="button" id="tlb-next">Next step</button><button class="btn" type="button" id="tlb-reset">Reset</button></div>
+    <div class="flow" id="tlb-flow"></div>
+    <div class="verdict" id="tlb-say" aria-live="polite"></div>
+  </div>
+  <p>Writing CR3 flushes the TLB. In <code>setuvmwrite()</code> that is the last real line, <code>lcr3(V2P(pgdir))</code>. You will see it in Module 6. Without it the write in the last step succeeds. We proved this with a test (Module 8).</p>
+  <h3>The kernel also obeys read-only pages</h3>
+  <p><code>entry.S</code> turns paging on and also sets <code>CR0_WP</code>. With WP set, even kernel-mode writes respect read-only pages.</p>
+  <figure class="code"><figcaption>entry.S · lines 53–56</figcaption><pre tabindex="0"><code><span class="l"><i>53</i><b><span class="w">  </span><span class="c1"># Turn on paging.</span></b></span><span class="l"><i>54</i><b><span class="w">  </span><span class="n">movl</span><span class="w">    </span><span class="o">%cr0, %</span><span class="n">eax</span></b></span><span class="l hl"><i>55</i><b><span class="w">  </span><span class="n">orl</span><span class="w">     </span><span class="o">$</span><span class="p">(</span><span class="n">CR0_PG</span><span class="o">|</span><span class="n">CR0_WP</span><span class="p">),</span><span class="w"> </span>%<span class="n">eax</span></b></span><span class="l"><i>56</i><b><span class="w">  </span><span class="n">movl</span><span class="w">    </span><span class="o">%eax, %</span><span class="n">cr0</span></b></span></code></pre></figure>
+  <h3>What a protection fault looks like</h3>
+  <p>When user code writes a read-only page, the CPU raises trap 14, a page fault. This existing handler runs. In user mode it prints a message, marks only that process killed, and returns. In kernel mode it calls <code>panic</code>.</p>
+  <figure class="code"><figcaption>trap.c · lines 82–95</figcaption><pre tabindex="0"><code><span class="l"><i>82</i><b><span class="w">  </span><span class="k">default</span><span class="o">:</span></b></span><span class="l"><i>83</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">myproc</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">cs</span><span class="o">&amp;</span><span class="mi">3</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">){</span></b></span><span class="l"><i>84</i><b><span class="w">      </span><span class="c1">// In kernel, it must be our mistake.</span></b></span><span class="l"><i>85</i><b><span class="w">      </span><span class="n">cprintf</span><span class="p">(</span><span class="s">"unexpected trap %d from cpu %d eip %x (cr2=0x%x)</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span></b></span><span class="l"><i>86</i><b><span class="w">              </span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">trapno</span><span class="p">,</span><span class="w"> </span><span class="n">cpuid</span><span class="p">(),</span><span class="w"> </span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">eip</span><span class="p">,</span><span class="w"> </span><span class="n">rcr2</span><span class="p">());</span></b></span><span class="l hl"><i>87</i><b><span class="w">      </span><span class="n">panic</span><span class="p">(</span><span class="s">"trap"</span><span class="p">);</span></b></span><span class="l"><i>88</i><b><span class="w">    </span><span class="p">}</span></b></span><span class="l hl"><i>89</i><b><span class="w">    </span><span class="c1">// In user space, assume process misbehaved.</span></b></span><span class="l"><i>90</i><b><span class="w">    </span><span class="n">cprintf</span><span class="p">(</span><span class="s">"pid %d %s: trap %d err %d on cpu %d "</span></b></span><span class="l"><i>91</i><b><span class="w">            </span><span class="s">"eip 0x%x addr 0x%x--kill proc</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span></b></span><span class="l"><i>92</i><b><span class="w">            </span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">pid</span><span class="p">,</span><span class="w"> </span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">trapno</span><span class="p">,</span></b></span><span class="l"><i>93</i><b><span class="w">            </span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">err</span><span class="p">,</span><span class="w"> </span><span class="n">cpuid</span><span class="p">(),</span><span class="w"> </span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">eip</span><span class="p">,</span><span class="w"> </span><span class="n">rcr2</span><span class="p">());</span></b></span><span class="l hl"><i>94</i><b><span class="w">    </span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">killed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span></b></span><span class="l"><i>95</i><b><span class="w">  </span><span class="p">}</span></b></span></code></pre></figure>
+  <div class="sim" id="err-sim">
+    <p class="st">Try it</p><h3>Error-code decoder</h3>
+    <p>The CPU's error code is three bits. Set them and read the result.</p>
+    <div class="row"><label><input type="checkbox" id="err-p"> bit 0: page was present (1)</label>
+      <label><input type="checkbox" id="err-w"> bit 1: it was a write (2)</label><label><input type="checkbox" id="err-u"> bit 2: user mode (4)</label></div>
+    <div class="verdict" id="err-out" aria-live="polite"></div>
+  </div>
+  <p>Set all three and you get <code>err 7</code>. That is a user write to a present page that does not allow writes. It is our protection firing. The parent is a different address space, so it keeps running and learns the result through a pipe.</p>
+  <div class="quiz" data-m="m4"></div>
+</section>
+
+<!-- ============ MODULE 5 ============ -->
+<section class="module" id="m5">
+  <div class="mhead"><p class="kick">Module 5 of 11</p><h2>The solution map</h2><p class="meta">10 min · interactive: call tracer · checkpoint</p>
+    <p class="goal">By the end you can trace one <code>mprotect(p, 2)</code> call through every file it touches. This is a very likely viva question.</p></div>
+  <p>We copied the pattern of an existing call, <code>uptime</code>. Click through the six stations.</p>
+  <div class="sim" id="trace">
+    <p class="st">Try it</p><h3>One call, end to end</h3>
+    <div class="tabs" role="tablist" id="trace-tabs"></div>
+    <div id="trace-body">
+      <div class="stn" data-t="1"><p><b>The program calls <code>mprotect(p, 2)</code>.</b> The prototype in <code>user.h</code> lets it compile.</p><figure class="code"><figcaption>user.h · lines 22–28</figcaption><pre tabindex="0"><code><span class="l"><i>22</i><b><span class="kt">int</span><span class="w"> </span><span class="nf">getpid</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></b></span><span class="l"><i>23</i><b><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="nf">sbrk</span><span class="p">(</span><span class="kt">int</span><span class="p">);</span></b></span><span class="l"><i>24</i><b><span class="kt">int</span><span class="w"> </span><span class="nf">sleep</span><span class="p">(</span><span class="kt">int</span><span class="p">);</span></b></span><span class="l"><i>25</i><b><span class="kt">int</span><span class="w"> </span><span class="nf">uptime</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></b></span><span class="l hl"><i>26</i><b><span class="kt">int</span><span class="w"> </span><span class="nf">mprotect</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">);</span></b></span><span class="l hl"><i>27</i><b><span class="kt">int</span><span class="w"> </span><span class="nf">munprotect</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">);</span></b></span><span class="l"><i>28</i><b>&nbsp;</b></span></code></pre></figure></div>
+      <div class="stn" data-t="2"><p><b>A stub puts the call number in EAX and traps.</b> The macro is shared by every call; ours are the last two lines.</p><figure class="code"><figcaption>usys.S · lines 4–9</figcaption><pre tabindex="0"><code><span class="l"><i>4</i><b><span class="c1">#define SYSCALL(name) \</span></b></span><span class="l"><i>5</i><b><span class="w">  </span><span class="n">.globl</span><span class="w"> </span><span class="n">name</span><span class="p">;</span><span class="w"> </span>\</b></span><span class="l"><i>6</i><b><span class="w">  </span><span class="n">name</span><span class="o">:</span><span class="w"> </span>\</b></span><span class="l"><i>7</i><b><span class="w">    </span><span class="n">movl</span><span class="w"> </span><span class="o">$</span><span class="n">SYS_</span><span class="w"> </span><span class="c1">## name, %eax; \</span></b></span><span class="l"><i>8</i><b><span class="w">    </span><span class="n">int</span><span class="w"> </span><span class="o">$</span><span class="n">T_SYSCALL</span><span class="p">;</span><span class="w"> </span>\</b></span><span class="l"><i>9</i><b><span class="w">    </span><span class="n">ret</span></b></span></code></pre></figure><figure class="code"><figcaption>usys.S · lines 31–33</figcaption><pre tabindex="0"><code><span class="l"><i>31</i><b><span class="nf">SYSCALL</span><span class="p">(</span><span class="n">uptime</span><span class="p">)</span></b></span><span class="l hl"><i>32</i><b><span class="nf">SYSCALL</span><span class="p">(</span><span class="n">mprotect</span><span class="p">)</span></b></span><span class="l hl"><i>33</i><b><span class="nf">SYSCALL</span><span class="p">(</span><span class="n">munprotect</span><span class="p">)</span></b></span></code></pre></figure><figure class="code"><figcaption>syscall.h · lines 22–24</figcaption><pre tabindex="0"><code><span class="l"><i>22</i><b><span class="cp">#define SYS_close  21</span></b></span><span class="l hl"><i>23</i><b><span class="cp">#define SYS_mprotect   22</span></b></span><span class="l hl"><i>24</i><b><span class="cp">#define SYS_munprotect 23</span></b></span></code></pre></figure></div>
+      <div class="stn" data-t="3"><p><b><code>syscall()</code> looks up slot 22.</b> It reads the number from EAX, calls the handler, and writes the return value back into EAX.</p><figure class="code"><figcaption>syscall.c · lines 141–153</figcaption><pre tabindex="0"><code><span class="l hl"><i>141</i><b><span class="p">[</span><span class="n">SYS_mprotect</span><span class="p">]</span><span class="w">   </span><span class="n">sys_mprotect</span><span class="p">,</span></b></span><span class="l hl"><i>142</i><b><span class="p">[</span><span class="n">SYS_munprotect</span><span class="p">]</span><span class="w"> </span><span class="n">sys_munprotect</span><span class="p">,</span></b></span><span class="l"><i>143</i><b><span class="p">};</span></b></span><span class="l"><i>144</i><b>&nbsp;</b></span><span class="l"><i>145</i><b><span class="kt">void</span></b></span><span class="l"><i>146</i><b><span class="n">syscall</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></b></span><span class="l"><i>147</i><b><span class="p">{</span></b></span><span class="l"><i>148</i><b><span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">num</span><span class="p">;</span></b></span><span class="l"><i>149</i><b><span class="w">  </span><span class="k">struct</span><span class="w"> </span><span class="nc">proc</span><span class="w"> </span><span class="o">*</span><span class="n">curproc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">myproc</span><span class="p">();</span></b></span><span class="l"><i>150</i><b>&nbsp;</b></span><span class="l hl"><i>151</i><b><span class="w">  </span><span class="n">num</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">curproc</span><span class="o">-&gt;</span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">eax</span><span class="p">;</span></b></span><span class="l"><i>152</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">num</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">num</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">NELEM</span><span class="p">(</span><span class="n">syscalls</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">syscalls</span><span class="p">[</span><span class="n">num</span><span class="p">])</span><span class="w"> </span><span class="p">{</span></b></span><span class="l hl"><i>153</i><b><span class="w">    </span><span class="n">curproc</span><span class="o">-&gt;</span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">eax</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">syscalls</span><span class="p">[</span><span class="n">num</span><span class="p">]();</span></b></span></code></pre></figure></div>
+      <div class="stn" data-t="4"><p><b><code>sys_mprotect</code> fetches the arguments.</b> Both calls share one front end; only the last argument differs.</p><figure class="code"><figcaption>sysproc.c · lines 93–117</figcaption><pre tabindex="0"><code><span class="l"><i>93</i><b><span class="c1">// Project addition: page-granular write protection.</span></b></span><span class="l"><i>94</i><b><span class="c1">// mprotect(addr, len) clears write permission on len pages starting</span></b></span><span class="l"><i>95</i><b><span class="c1">// at the page-aligned address addr; munprotect restores it.</span></b></span><span class="l"><i>96</i><b><span class="k">static</span><span class="w"> </span><span class="kt">int</span></b></span><span class="l"><i>97</i><b><span class="n">changeprotection</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">writable</span><span class="p">)</span></b></span><span class="l"><i>98</i><b><span class="p">{</span></b></span><span class="l"><i>99</i><b><span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">;</span></b></span><span class="l"><i>100</i><b><span class="w">  </span><span class="k">struct</span><span class="w"> </span><span class="nc">proc</span><span class="w"> </span><span class="o">*</span><span class="n">curproc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">myproc</span><span class="p">();</span></b></span><span class="l"><i>101</i><b>&nbsp;</b></span><span class="l hl"><i>102</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">argint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">addr</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">argint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>103</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l hl"><i>104</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">setuvmwrite</span><span class="p">(</span><span class="n">curproc</span><span class="o">-&gt;</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="n">curproc</span><span class="o">-&gt;</span><span class="n">sz</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">uint</span><span class="p">)</span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="n">writable</span><span class="p">);</span></b></span><span class="l"><i>105</i><b><span class="p">}</span></b></span><span class="l"><i>106</i><b>&nbsp;</b></span><span class="l"><i>107</i><b><span class="kt">int</span></b></span><span class="l"><i>108</i><b><span class="n">sys_mprotect</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></b></span><span class="l"><i>109</i><b><span class="p">{</span></b></span><span class="l hl"><i>110</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">changeprotection</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span></b></span><span class="l"><i>111</i><b><span class="p">}</span></b></span><span class="l"><i>112</i><b>&nbsp;</b></span><span class="l"><i>113</i><b><span class="kt">int</span></b></span><span class="l"><i>114</i><b><span class="n">sys_munprotect</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></b></span><span class="l"><i>115</i><b><span class="p">{</span></b></span><span class="l hl"><i>116</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">changeprotection</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span></b></span><span class="l"><i>117</i><b><span class="p">}</span></b></span></code></pre></figure></div>
+      <div class="stn" data-t="5"><p><b><code>setuvmwrite()</code> does the work.</b> It validates, changes the write bit and flushes the TLB. Module 6 takes it apart.</p><figure class="code"><figcaption>vm.c · lines 319–331</figcaption><pre tabindex="0"><code><span class="l hl"><i>319</i><b><span class="kt">int</span></b></span><span class="l hl"><i>320</i><b><span class="n">setuvmwrite</span><span class="p">(</span><span class="n">pde_t</span><span class="w"> </span><span class="o">*</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="n">uint</span><span class="w"> </span><span class="n">sz</span><span class="p">,</span><span class="w"> </span><span class="n">uint</span><span class="w"> </span><span class="n">va</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">npages</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">writable</span><span class="p">)</span></b></span><span class="l"><i>321</i><b><span class="p">{</span></b></span><span class="l"><i>322</i><b><span class="w">  </span><span class="n">uint</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">end</span><span class="p">;</span></b></span><span class="l"><i>323</i><b><span class="w">  </span><span class="n">pte_t</span><span class="w"> </span><span class="o">*</span><span class="n">pte</span><span class="p">;</span></b></span><span class="l"><i>324</i><b>&nbsp;</b></span><span class="l"><i>325</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">va</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">PGSIZE</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">npages</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">sz</span><span class="p">)</span></b></span><span class="l"><i>326</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>327</i><b><span class="w">  </span><span class="c1">// Compare page counts instead of computing va + npages*PGSIZE first,</span></b></span><span class="l"><i>328</i><b><span class="w">  </span><span class="c1">// so a large npages cannot overflow past the check.</span></b></span><span class="l"><i>329</i><b><span class="w">  </span><span class="k">if</span><span class="p">((</span><span class="n">uint</span><span class="p">)</span><span class="n">npages</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">sz</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">va</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">)</span></b></span><span class="l"><i>330</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>331</i><b><span class="w">  </span><span class="n">end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">uint</span><span class="p">)</span><span class="n">npages</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">;</span></b></span></code></pre></figure></div>
+      <div class="stn" data-t="6"><p><b>The result returns in EAX.</b> <code>0</code> means success, <code>-1</code> means a bad request. The page table is already changed and the TLB flushed, so the very next write in the program is checked against the new permission.</p></div>
+    </div>
+  </div>
+  <h3>Where everything lives</h3>
+  <div class="tw"><table>
+    <tr><th>File</th><th>What we added</th><th>Lines</th></tr>
+    <tr><td><code>vm.c</code></td><td><code>setuvmwrite</code>, <code>checkuvmwrite</code>, a check in <code>copyout</code></td><td>313–378, 444</td></tr>
+    <tr><td><code>sysproc.c</code></td><td><code>changeprotection</code>, <code>sys_mprotect</code>, <code>sys_munprotect</code></td><td>93–117</td></tr>
+    <tr><td><code>syscall.c</code></td><td><code>argptrw</code>, handlers and table slots</td><td>72–80, 116–117, 141–142</td></tr>
+    <tr><td><code>sysfile.c</code></td><td><code>argptr</code> became <code>argptrw</code> in read, fstat, pipe</td><td>76, 112, 429</td></tr>
+    <tr><td><code>syscall.h</code> <code>usys.S</code> <code>user.h</code> <code>defs.h</code></td><td>numbers 22 and 23, stubs, prototypes</td><td>2–3 lines each</td></tr>
+    <tr><td><code>Makefile</code></td><td><code>_vmtest</code> and <code>_vmdemo</code> in the program list</td><td>184–185</td></tr>
+    <tr><td><code>vmtest.c</code> <code>vmdemo.c</code></td><td>the test suite and the demo</td><td>311 and 91 lines</td></tr>
+    <tr><td><code>scripts/smoke.py</code></td><td>runs <code>vmtest</code> and cross-checks the kernel's messages</td><td>16–33</td></tr>
+  </table></div>
+  <div class="quiz" data-m="m5"></div>
+</section>
+
+<!-- ============ MODULE 6 ============ -->
+<section class="module" id="m6">
+  <div class="mhead"><p class="kick">Module 6 of 11</p><h2>setuvmwrite, line by line</h2><p class="meta">20 min · interactive: overflow calculator, two-pass simulator · checkpoint</p>
+    <p class="goal">By the end you can rewrite this function from memory and defend each line. It is the heart of the project.</p></div>
+  <p>The function takes the page directory, the process size <code>sz</code>, a start address, a page count and the wanted state (<code>writable</code> is 1 for <code>munprotect</code>, 0 for <code>mprotect</code>). Five blocks, in order.</p>
+  <div class="tb"><figure class="code"><figcaption>vm.c · lines 325–326</figcaption><pre tabindex="0"><code><span class="l hl"><i>325</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">va</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">PGSIZE</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">npages</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">sz</span><span class="p">)</span></b></span><span class="l hl"><i>326</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span></code></pre></figure><div class="say"><p class="t">1 · Reject bad arguments</p><p>The address must be page-aligned, there must be at least one page, and the start must be inside the process. Because <code>npages</code> is a signed <code>int</code>, negative counts fail here too.</p></div></div>
+  <div class="tb"><figure class="code"><figcaption>vm.c · lines 327–331</figcaption><pre tabindex="0"><code><span class="l"><i>327</i><b><span class="w">  </span><span class="c1">// Compare page counts instead of computing va + npages*PGSIZE first,</span></b></span><span class="l"><i>328</i><b><span class="w">  </span><span class="c1">// so a large npages cannot overflow past the check.</span></b></span><span class="l hl"><i>329</i><b><span class="w">  </span><span class="k">if</span><span class="p">((</span><span class="n">uint</span><span class="p">)</span><span class="n">npages</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">sz</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">va</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">)</span></b></span><span class="l"><i>330</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l hl"><i>331</i><b><span class="w">  </span><span class="n">end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">uint</span><span class="p">)</span><span class="n">npages</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">;</span></b></span></code></pre></figure><div class="say"><p class="t">2 · Compare counts, then compute the end</p><p>We do not compute <code>va + npages*4096</code> first, because that can overflow 32 bits. Instead we ask how many whole pages fit between <code>va</code> and <code>sz</code>. Only then is <code>end</code> safe.</p></div></div>
+  <div class="tb"><figure class="code"><figcaption>vm.c · lines 333–339</figcaption><pre tabindex="0"><code><span class="l"><i>333</i><b><span class="w">  </span><span class="c1">// Pass 1: every page must already be a present user page.</span></b></span><span class="l"><i>334</i><b><span class="w">  </span><span class="c1">// The stack guard page has PTE_U cleared and is rejected here.</span></b></span><span class="l"><i>335</i><b><span class="w">  </span><span class="k">for</span><span class="p">(</span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">va</span><span class="p">;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">end</span><span class="p">;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">){</span></b></span><span class="l hl"><i>336</i><b><span class="w">    </span><span class="n">pte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">walkpgdir</span><span class="p">(</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// never allocates</span></b></span><span class="l hl"><i>337</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">pte</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">PTE_P</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">PTE_U</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>338</i><b><span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>339</i><b><span class="w">  </span><span class="p">}</span></b></span></code></pre></figure><div class="say"><p class="t">3 · Pass one: validate every page</p><p>For each page, find the PTE without allocating (<code>0</code> is the <code>alloc</code> flag). It must exist, be present, and be a user page. The stack guard page has no <code>PTE_U</code>, so it fails here.</p></div></div>
+  <div class="tb"><figure class="code"><figcaption>vm.c · lines 341–348</figcaption><pre tabindex="0"><code><span class="l"><i>341</i><b><span class="w">  </span><span class="c1">// Pass 2: change only the write bit.</span></b></span><span class="l"><i>342</i><b><span class="w">  </span><span class="k">for</span><span class="p">(</span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">va</span><span class="p">;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">end</span><span class="p">;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">){</span></b></span><span class="l"><i>343</i><b><span class="w">    </span><span class="n">pte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">walkpgdir</span><span class="p">(</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span></b></span><span class="l hl"><i>344</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">writable</span><span class="p">)</span></b></span><span class="l hl"><i>345</i><b><span class="w">      </span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">PTE_W</span><span class="p">;</span></b></span><span class="l hl"><i>346</i><b><span class="w">    </span><span class="k">else</span></b></span><span class="l hl"><i>347</i><b><span class="w">      </span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="n">PTE_W</span><span class="p">;</span></b></span><span class="l"><i>348</i><b><span class="w">  </span><span class="p">}</span></b></span></code></pre></figure><div class="say"><p class="t">4 · Pass two: change only the write bit</p><p>This runs only if pass one accepted every page, so it cannot fail halfway. It sets or clears <code>PTE_W</code> and touches nothing else.</p></div></div>
+  <div class="tb"><figure class="code"><figcaption>vm.c · lines 350–353</figcaption><pre tabindex="0"><code><span class="l"><i>350</i><b><span class="w">  </span><span class="c1">// Reloading CR3 flushes this CPU's cached (TLB) translations.</span></b></span><span class="l hl"><i>351</i><b><span class="w">  </span><span class="n">lcr3</span><span class="p">(</span><span class="n">V2P</span><span class="p">(</span><span class="n">pgdir</span><span class="p">));</span></b></span><span class="l"><i>352</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span></b></span><span class="l"><i>353</i><b><span class="p">}</span></b></span></code></pre></figure><div class="say"><p class="t">5 · Flush the TLB</p><p><code>lcr3</code> reloads the page-directory register, which empties the TLB. <code>V2P</code> is needed because CR3 takes a <b>physical</b> address and <code>pgdir</code> is a kernel virtual one.</p></div></div>
+  <details><summary>Show the whole function in one piece (lines 313–353)</summary><figure class="code"><figcaption>vm.c · lines 313–353</figcaption><pre tabindex="0"><code><span class="l"><i>313</i><b><span class="c1">// Project addition: set (writable != 0) or clear (writable == 0)</span></b></span><span class="l"><i>314</i><b><span class="c1">// PTE_W on npages user pages starting at va in pgdir, the page table</span></b></span><span class="l"><i>315</i><b><span class="c1">// of the current process whose user memory is [0, sz).</span></b></span><span class="l"><i>316</i><b><span class="c1">// The whole range is validated before any PTE changes, so a failed</span></b></span><span class="l"><i>317</i><b><span class="c1">// call leaves every permission as it was. Only PTE_W is modified.</span></b></span><span class="l"><i>318</i><b><span class="c1">// Returns 0 on success, -1 on an invalid request.</span></b></span><span class="l"><i>319</i><b><span class="kt">int</span></b></span><span class="l"><i>320</i><b><span class="n">setuvmwrite</span><span class="p">(</span><span class="n">pde_t</span><span class="w"> </span><span class="o">*</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="n">uint</span><span class="w"> </span><span class="n">sz</span><span class="p">,</span><span class="w"> </span><span class="n">uint</span><span class="w"> </span><span class="n">va</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">npages</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">writable</span><span class="p">)</span></b></span><span class="l"><i>321</i><b><span class="p">{</span></b></span><span class="l"><i>322</i><b><span class="w">  </span><span class="n">uint</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">end</span><span class="p">;</span></b></span><span class="l"><i>323</i><b><span class="w">  </span><span class="n">pte_t</span><span class="w"> </span><span class="o">*</span><span class="n">pte</span><span class="p">;</span></b></span><span class="l"><i>324</i><b>&nbsp;</b></span><span class="l"><i>325</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">va</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">PGSIZE</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">npages</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">sz</span><span class="p">)</span></b></span><span class="l"><i>326</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>327</i><b><span class="w">  </span><span class="c1">// Compare page counts instead of computing va + npages*PGSIZE first,</span></b></span><span class="l"><i>328</i><b><span class="w">  </span><span class="c1">// so a large npages cannot overflow past the check.</span></b></span><span class="l"><i>329</i><b><span class="w">  </span><span class="k">if</span><span class="p">((</span><span class="n">uint</span><span class="p">)</span><span class="n">npages</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">sz</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">va</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">)</span></b></span><span class="l"><i>330</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>331</i><b><span class="w">  </span><span class="n">end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">uint</span><span class="p">)</span><span class="n">npages</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">;</span></b></span><span class="l"><i>332</i><b>&nbsp;</b></span><span class="l"><i>333</i><b><span class="w">  </span><span class="c1">// Pass 1: every page must already be a present user page.</span></b></span><span class="l"><i>334</i><b><span class="w">  </span><span class="c1">// The stack guard page has PTE_U cleared and is rejected here.</span></b></span><span class="l"><i>335</i><b><span class="w">  </span><span class="k">for</span><span class="p">(</span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">va</span><span class="p">;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">end</span><span class="p">;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">){</span></b></span><span class="l"><i>336</i><b><span class="w">    </span><span class="n">pte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">walkpgdir</span><span class="p">(</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// never allocates</span></b></span><span class="l"><i>337</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">pte</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">PTE_P</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">PTE_U</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>338</i><b><span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>339</i><b><span class="w">  </span><span class="p">}</span></b></span><span class="l"><i>340</i><b>&nbsp;</b></span><span class="l"><i>341</i><b><span class="w">  </span><span class="c1">// Pass 2: change only the write bit.</span></b></span><span class="l"><i>342</i><b><span class="w">  </span><span class="k">for</span><span class="p">(</span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">va</span><span class="p">;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">end</span><span class="p">;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">){</span></b></span><span class="l"><i>343</i><b><span class="w">    </span><span class="n">pte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">walkpgdir</span><span class="p">(</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span></b></span><span class="l"><i>344</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">writable</span><span class="p">)</span></b></span><span class="l"><i>345</i><b><span class="w">      </span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">PTE_W</span><span class="p">;</span></b></span><span class="l"><i>346</i><b><span class="w">    </span><span class="k">else</span></b></span><span class="l"><i>347</i><b><span class="w">      </span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="n">PTE_W</span><span class="p">;</span></b></span><span class="l"><i>348</i><b><span class="w">  </span><span class="p">}</span></b></span><span class="l"><i>349</i><b>&nbsp;</b></span><span class="l"><i>350</i><b><span class="w">  </span><span class="c1">// Reloading CR3 flushes this CPU's cached (TLB) translations.</span></b></span><span class="l"><i>351</i><b><span class="w">  </span><span class="n">lcr3</span><span class="p">(</span><span class="n">V2P</span><span class="p">(</span><span class="n">pgdir</span><span class="p">));</span></b></span><span class="l"><i>352</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span></b></span><span class="l"><i>353</i><b><span class="p">}</span></b></span></code></pre></figure></details>
+
+  <div class="sim" id="ovf-sim">
+    <p class="st">Try it</p><h3>Why we compare counts: the overflow calculator</h3>
+    <p>Process size is <code>sz</code>. Enter a start and a page count (hex like <code>0x1000</code>, decimal, or negative). Compare the naive check with ours, using real 32-bit arithmetic.</p>
+    <div class="row"><label for="o-va">va</label><input type="text" id="o-va" value="0x1000" spellcheck="false">
+      <label for="o-np">npages</label><input type="text" id="o-np" value="0x100000" spellcheck="false">
+      <label for="o-sz">sz</label><input type="text" id="o-sz" value="0x9000" spellcheck="false"></div>
+    <div class="row"><button class="btn" type="button" data-p="0x1000|0x100000|0x9000">wraps to 0</button><button class="btn" type="button" data-p="0x1000|8|0x9000">just fits</button>
+      <button class="btn" type="button" data-p="0x1000|9|0x9000">one too many</button><button class="btn" type="button" data-p="0x1000|-1|0x9000">negative</button></div>
+    <div class="out" id="o-out" aria-live="polite"></div>
+  </div>
+
+  <div class="sim" id="two-sim">
+    <p class="st">Try it</p><h3>Why two passes: the failed-call simulator</h3>
+    <p>Five pages are writable. Click a page to make it invalid (a bad page in the range), then run <code>mprotect(p, 5)</code> with each method.</p>
+    <div class="pages" id="two-pages" role="group" aria-label="Pages"></div>
+    <div class="row"><label><input type="radio" name="two-mode" value="one"> one pass (change as you go)</label>
+      <label><input type="radio" name="two-mode" value="two" checked> two passes (ours)</label>
+      <button class="btn accent" type="button" id="two-run">Run mprotect(p, 5)</button><button class="btn" type="button" id="two-reset">Reset</button></div>
+    <div class="verdict" id="two-out" aria-live="polite">Choose a mode and run it.</div>
+  </div>
+  <p>Fork needed no change. <code>copyuvm()</code> copies each page's flags into the child's own new page, so read-only is inherited, and later changes in either process cannot affect the other.</p>
+  <figure class="code"><figcaption>vm.c · lines 392–402</figcaption><pre tabindex="0"><code><span class="l"><i>392</i><b><span class="w">  </span><span class="k">for</span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">sz</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">){</span></b></span><span class="l"><i>393</i><b><span class="w">    </span><span class="k">if</span><span class="p">((</span><span class="n">pte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">walkpgdir</span><span class="p">(</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>394</i><b><span class="w">      </span><span class="n">panic</span><span class="p">(</span><span class="s">"copyuvm: pte should exist"</span><span class="p">);</span></b></span><span class="l"><i>395</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">PTE_P</span><span class="p">))</span></b></span><span class="l"><i>396</i><b><span class="w">      </span><span class="n">panic</span><span class="p">(</span><span class="s">"copyuvm: page not present"</span><span class="p">);</span></b></span><span class="l hl"><i>397</i><b><span class="w">    </span><span class="n">pa</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PTE_ADDR</span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="p">);</span></b></span><span class="l hl"><i>398</i><b><span class="w">    </span><span class="n">flags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PTE_FLAGS</span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="p">);</span></b></span><span class="l"><i>399</i><b><span class="w">    </span><span class="k">if</span><span class="p">((</span><span class="n">mem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kalloc</span><span class="p">())</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>400</i><b><span class="w">      </span><span class="k">goto</span><span class="w"> </span><span class="n">bad</span><span class="p">;</span></b></span><span class="l hl"><i>401</i><b><span class="w">    </span><span class="n">memmove</span><span class="p">(</span><span class="n">mem</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">char</span><span class="o">*</span><span class="p">)</span><span class="n">P2V</span><span class="p">(</span><span class="n">pa</span><span class="p">),</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">);</span></b></span><span class="l hl"><i>402</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">mappages</span><span class="p">(</span><span class="n">d</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">,</span><span class="w"> </span><span class="n">V2P</span><span class="p">(</span><span class="n">mem</span><span class="p">),</span><span class="w"> </span><span class="n">flags</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span></b></span></code></pre></figure>
+  <div class="quiz" data-m="m6"></div>
+</section>
+
+<!-- ============ MODULE 7 ============ -->
+<section class="module" id="m7">
+  <div class="mhead"><p class="kick">Module 7 of 11</p><h2>The kernel's blind spot</h2><p class="meta">12 min · interactive: syscall simulator · checkpoint</p>
+    <p class="goal">By the end you can explain the crash we found, why <code>write()</code> is exempt, and what each of the four fixes does.</p></div>
+  <div class="note bad"><p class="t">The bug we reproduced</p><p>Before this fix, <code>read()</code> from a pipe into a protected page crashed the guest kernel with <code>unexpected trap 14 ... panic: trap</code>. User code was never the problem. The kernel itself wrote into the page, and WP made that a kernel-mode fault.</p></div>
+  <div class="sim" id="kb-sim">
+    <p class="st">Try it</p><h3>Syscall simulator</h3>
+    <div class="row"><label for="kb-call">System call</label><select id="kb-call">
+      <option value="read">read(fd, buf, n): kernel WRITES into buf</option><option value="fstat">fstat(fd, &amp;st): kernel WRITES into st</option>
+      <option value="pipe">pipe(fd): kernel WRITES into fd[2]</option><option value="write">write(fd, buf, n): kernel only READS buf</option></select>
+      <label for="kb-page">Buffer page</label><select id="kb-page"><option value="ro">protected (read-only)</option><option value="rw">writable</option></select>
+      <label><input type="checkbox" id="kb-fix" checked> our check (<code>argptrw</code>) is in place</label></div>
+    <div class="verdict" id="kb-out" aria-live="polite"></div>
+  </div>
+  <p>The new check walks every page the buffer touches, so a buffer that starts in a writable page and runs into a protected one is also caught.</p>
+  <div class="tb"><figure class="code"><figcaption>vm.c · lines 361–378</figcaption><pre tabindex="0"><code><span class="l"><i>361</i><b><span class="kt">int</span></b></span><span class="l"><i>362</i><b><span class="n">checkuvmwrite</span><span class="p">(</span><span class="n">pde_t</span><span class="w"> </span><span class="o">*</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="n">uint</span><span class="w"> </span><span class="n">va</span><span class="p">,</span><span class="w"> </span><span class="n">uint</span><span class="w"> </span><span class="n">len</span><span class="p">)</span></b></span><span class="l"><i>363</i><b><span class="p">{</span></b></span><span class="l"><i>364</i><b><span class="w">  </span><span class="n">uint</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">last</span><span class="p">;</span></b></span><span class="l"><i>365</i><b><span class="w">  </span><span class="n">pte_t</span><span class="w"> </span><span class="o">*</span><span class="n">pte</span><span class="p">;</span></b></span><span class="l"><i>366</i><b>&nbsp;</b></span><span class="l hl"><i>367</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">len</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>368</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span></b></span><span class="l hl"><i>369</i><b><span class="w">  </span><span class="n">last</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PGROUNDDOWN</span><span class="p">(</span><span class="n">va</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">len</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span></b></span><span class="l"><i>370</i><b><span class="w">  </span><span class="k">for</span><span class="p">(</span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PGROUNDDOWN</span><span class="p">(</span><span class="n">va</span><span class="p">);</span><span class="w"> </span><span class="p">;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">){</span></b></span><span class="l"><i>371</i><b><span class="w">    </span><span class="n">pte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">walkpgdir</span><span class="p">(</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span></b></span><span class="l hl"><i>372</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">pte</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="n">PTE_P</span><span class="o">|</span><span class="n">PTE_U</span><span class="o">|</span><span class="n">PTE_W</span><span class="p">))</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="p">(</span><span class="n">PTE_P</span><span class="o">|</span><span class="n">PTE_U</span><span class="o">|</span><span class="n">PTE_W</span><span class="p">))</span></b></span><span class="l"><i>373</i><b><span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>374</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">a</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">last</span><span class="p">)</span></b></span><span class="l"><i>375</i><b><span class="w">      </span><span class="k">break</span><span class="p">;</span></b></span><span class="l"><i>376</i><b><span class="w">  </span><span class="p">}</span></b></span><span class="l"><i>377</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span></b></span><span class="l"><i>378</i><b><span class="p">}</span></b></span></code></pre></figure><div class="say"><p class="t">checkuvmwrite</p><p>Length zero is fine. Otherwise find the last page and loop from the first. All three flags, present, user and writable, must be set on every page. It never allocates.</p></div></div>
+  <div class="tb"><figure class="code"><figcaption>syscall.c · lines 72–80</figcaption><pre tabindex="0"><code><span class="l"><i>72</i><b><span class="c1">// Project addition: like argptr, but for a buffer the kernel will</span></b></span><span class="l"><i>73</i><b><span class="c1">// write into. Also requires every page of the buffer to be writable.</span></b></span><span class="l"><i>74</i><b><span class="kt">int</span></b></span><span class="l"><i>75</i><b><span class="n">argptrw</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">**</span><span class="n">pp</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">size</span><span class="p">)</span></b></span><span class="l"><i>76</i><b><span class="p">{</span></b></span><span class="l hl"><i>77</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">argptr</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">pp</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>78</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l hl"><i>79</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">checkuvmwrite</span><span class="p">(</span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">uint</span><span class="p">)</span><span class="o">*</span><span class="n">pp</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="p">);</span></b></span><span class="l"><i>80</i><b><span class="p">}</span></b></span></code></pre></figure><div class="say"><p class="t">argptrw</p><p>The old bounds check first, then this check. One new function, so the three callers stay identical.</p></div></div>
+  <div class="tb"><figure class="code"><figcaption>sysfile.c · lines 69–82</figcaption><pre tabindex="0"><code><span class="l"><i>69</i><b><span class="kt">int</span></b></span><span class="l"><i>70</i><b><span class="n">sys_read</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></b></span><span class="l"><i>71</i><b><span class="p">{</span></b></span><span class="l"><i>72</i><b><span class="w">  </span><span class="k">struct</span><span class="w"> </span><span class="nc">file</span><span class="w"> </span><span class="o">*</span><span class="n">f</span><span class="p">;</span></b></span><span class="l"><i>73</i><b><span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span></b></span><span class="l"><i>74</i><b><span class="w">  </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">;</span></b></span><span class="l"><i>75</i><b>&nbsp;</b></span><span class="l hl"><i>76</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">argfd</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">f</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">argint</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">argptrw</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>77</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>78</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">fileread</span><span class="p">(</span><span class="n">f</span><span class="p">,</span><span class="w"> </span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">);</span></b></span><span class="l"><i>79</i><b><span class="p">}</span></b></span><span class="l"><i>80</i><b>&nbsp;</b></span><span class="l"><i>81</i><b><span class="kt">int</span></b></span><span class="l"><i>82</i><b><span class="n">sys_write</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></b></span></code></pre></figure><div class="say"><p class="t">The callers</p><p>In <code>sys_read</code>, <code>argptr</code> became <code>argptrw</code>. <code>sys_fstat</code> (line 112) and <code>sys_pipe</code> (line 429) changed the same way. <code>sys_write</code> keeps <code>argptr</code>, because it only reads the buffer.</p></div></div>
+  <div class="tb"><figure class="code"><figcaption>vm.c · lines 438–452</figcaption><pre tabindex="0"><code><span class="l"><i>438</i><b><span class="w">  </span><span class="n">buf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">char</span><span class="o">*</span><span class="p">)</span><span class="n">p</span><span class="p">;</span></b></span><span class="l"><i>439</i><b><span class="w">  </span><span class="k">while</span><span class="p">(</span><span class="n">len</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">){</span></b></span><span class="l"><i>440</i><b><span class="w">    </span><span class="n">va0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">uint</span><span class="p">)</span><span class="n">PGROUNDDOWN</span><span class="p">(</span><span class="n">va</span><span class="p">);</span></b></span><span class="l hl"><i>441</i><b><span class="w">    </span><span class="n">pa0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">uva2ka</span><span class="p">(</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">char</span><span class="o">*</span><span class="p">)</span><span class="n">va0</span><span class="p">);</span></b></span><span class="l"><i>442</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">pa0</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>443</i><b><span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l hl"><i>444</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">checkuvmwrite</span><span class="p">(</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="n">va0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w">   </span><span class="c1">// project: honour PTE_W</span></b></span><span class="l hl"><i>445</i><b><span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>446</i><b><span class="w">    </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PGSIZE</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">(</span><span class="n">va</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">va0</span><span class="p">);</span></b></span><span class="l"><i>447</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">len</span><span class="p">)</span></b></span><span class="l"><i>448</i><b><span class="w">      </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">len</span><span class="p">;</span></b></span><span class="l"><i>449</i><b><span class="w">    </span><span class="n">memmove</span><span class="p">(</span><span class="n">pa0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">va</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">va0</span><span class="p">),</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">);</span></b></span><span class="l"><i>450</i><b><span class="w">    </span><span class="n">len</span><span class="w"> </span><span class="o">-=</span><span class="w"> </span><span class="n">n</span><span class="p">;</span></b></span><span class="l"><i>451</i><b><span class="w">    </span><span class="n">buf</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">n</span><span class="p">;</span></b></span><span class="l"><i>452</i><b><span class="w">    </span><span class="n">va</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">va0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">PGSIZE</span><span class="p">;</span></b></span></code></pre></figure><div class="say"><p class="t">copyout: the backdoor</p><p>It writes through the kernel's own mapping of the physical page, which is always writable, so it would bypass the user's read-only mapping. It now checks too. Its only caller is <code>exec</code>, writing a fresh stack, so behaviour is unchanged.</p></div></div>
+  <div class="note"><p class="t">Safe here, not everywhere</p><p>Check-then-write is safe because there is one CPU and no threads: nothing can change the page between the check and the write. A multi-CPU kernel would need a lock or fault handling.</p></div>
+  <div class="quiz" data-m="m7"></div>
+</section>
+
+<!-- ============ MODULE 8 ============ -->
+<section class="module" id="m8">
+  <div class="mhead"><p class="kick">Module 8 of 11</p><h2>Proving it works</h2><p class="meta">15 min · interactive: mutation lab, bug hunt · checkpoint</p>
+    <p class="goal">By the end you can say how a user program detects a fault, what each test group proves, and how we know the tests are real.</p></div>
+  <h3>How a test sees a fault</h3>
+  <p>A faulting write kills its process, and xv6's <code>wait()</code> returns no exit status. So the child writes a marker byte into a pipe <b>only if the write succeeded</b>. End of file means it died first.</p>
+  <figure class="code"><figcaption>vmtest.c · lines 38–68</figcaption><pre tabindex="0"><code><span class="l"><i>38</i><b><span class="k">static</span><span class="w"> </span><span class="kt">int</span></b></span><span class="l"><i>39</i><b><span class="n">childwritefaults</span><span class="p">(</span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">value</span><span class="p">)</span></b></span><span class="l"><i>40</i><b><span class="p">{</span></b></span><span class="l"><i>41</i><b><span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">fds</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="n">pid</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">;</span></b></span><span class="l"><i>42</i><b><span class="w">  </span><span class="kt">char</span><span class="w"> </span><span class="n">marker</span><span class="p">;</span></b></span><span class="l"><i>43</i><b>&nbsp;</b></span><span class="l"><i>44</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">pipe</span><span class="p">(</span><span class="n">fds</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">){</span></b></span><span class="l"><i>45</i><b><span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">"vmtest: pipe failed</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span></b></span><span class="l"><i>46</i><b><span class="w">    </span><span class="n">exit</span><span class="p">();</span></b></span><span class="l"><i>47</i><b><span class="w">  </span><span class="p">}</span></b></span><span class="l hl"><i>48</i><b><span class="w">  </span><span class="n">pid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fork</span><span class="p">();</span></b></span><span class="l"><i>49</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">pid</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">){</span></b></span><span class="l"><i>50</i><b><span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">"vmtest: fork failed</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span></b></span><span class="l"><i>51</i><b><span class="w">    </span><span class="n">exit</span><span class="p">();</span></b></span><span class="l"><i>52</i><b><span class="w">  </span><span class="p">}</span></b></span><span class="l"><i>53</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">pid</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">){</span></b></span><span class="l"><i>54</i><b><span class="w">    </span><span class="n">close</span><span class="p">(</span><span class="n">fds</span><span class="p">[</span><span class="mi">0</span><span class="p">]);</span></b></span><span class="l"><i>55</i><b><span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">"vmtest: child writing 0x%x (a fault is expected if protected)</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span></b></span><span class="l"><i>56</i><b><span class="w">           </span><span class="p">(</span><span class="n">uint</span><span class="p">)</span><span class="n">addr</span><span class="p">);</span></b></span><span class="l hl"><i>57</i><b><span class="w">    </span><span class="o">*</span><span class="n">addr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">value</span><span class="p">;</span></b></span><span class="l hl"><i>58</i><b><span class="w">    </span><span class="n">write</span><span class="p">(</span><span class="n">fds</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="s">"W"</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">   </span><span class="c1">// only reached if the write succeeded</span></b></span><span class="l"><i>59</i><b><span class="w">    </span><span class="n">exit</span><span class="p">();</span></b></span><span class="l"><i>60</i><b><span class="w">  </span><span class="p">}</span></b></span><span class="l"><i>61</i><b><span class="w">  </span><span class="n">close</span><span class="p">(</span><span class="n">fds</span><span class="p">[</span><span class="mi">1</span><span class="p">]);</span></b></span><span class="l hl"><i>62</i><b><span class="w">  </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">read</span><span class="p">(</span><span class="n">fds</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="o">&amp;</span><span class="n">marker</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span></b></span><span class="l"><i>63</i><b><span class="w">  </span><span class="n">close</span><span class="p">(</span><span class="n">fds</span><span class="p">[</span><span class="mi">0</span><span class="p">]);</span></b></span><span class="l"><i>64</i><b><span class="w">  </span><span class="n">wait</span><span class="p">();</span></b></span><span class="l hl"><i>65</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>66</i><b><span class="w">    </span><span class="n">faults</span><span class="o">++</span><span class="p">;</span></b></span><span class="l hl"><i>67</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span></b></span><span class="l"><i>68</i><b><span class="p">}</span></b></span></code></pre></figure>
+  <div class="tw"><table>
+    <tr><th>Test group</th><th>What it proves</th></tr>
+    <tr><td><code>basic</code></td><td>Protect, read, faulting write, restore, write again</td></tr>
+    <tr><td><code>immediate</code></td><td>The change is instant: no stale TLB entry (the CR3 test)</td></tr>
+    <tr><td><code>repeated</code></td><td>Calling twice is harmless</td></tr>
+    <tr><td><code>multiple</code></td><td>All pages in a range change; neighbours do not</td></tr>
+    <tr><td><code>forking</code></td><td>Child inherits; changes are independent both ways</td></tr>
+    <tr><td><code>invalid</code></td><td>Unaligned, zero, negative, overflow, wrap, past heap, kernel, guard page: all <code>-1</code>; and mixed ranges change nothing</td></tr>
+    <tr><td><code>kernelbuffers</code></td><td>read, fstat, pipe reject protected buffers; write still allowed</td></tr>
+  </table></div>
+  <p>The runner (<code>scripts/smoke.py</code>) goes one step further: the number of faulting children <code>vmtest</code> reports must equal the number of <code>trap 14 err 7</code> lines the kernel printed. A printed PASS alone is not evidence.</p>
+  <div class="sim" id="mut-sim">
+    <p class="st">Try it</p><h3>Mutation lab: break the code, see which test notices</h3>
+    <div class="tabs" role="tablist" id="mut-tabs"></div>
+    <div id="mut-out" aria-live="polite"></div>
+  </div>
+  <div class="sim" id="bug-sim">
+    <p class="st">Try it</p><h3>Spot the bug</h3>
+    <div class="tabs" id="bug-tabs"></div>
+    <p id="bug-q"></p><div class="bug" id="bug-code"></div><div class="verdict" id="bug-fb" aria-live="polite">Click the line you think is wrong.</div>
+  </div>
+  <h3>The real result</h3>
+  <div class="term"><div class="bar"><i></i><i></i><i></i>&nbsp;./scripts/xv6 check (captured output)</div><pre>$ ./scripts/xv6 clean
+$ ./scripts/xv6 check
+PASS: xv6 boot, shell command and upstream forktest
+PASS: vmtest page protection (10 expected user write faults, shell still alive)
+PASS: upstream usertests</pre></div>
+  <p>It passed in a Linux container, in GitHub Actions and on the Pop!_OS laptop. The Mac has so far passed only the baseline checks, so run <code>check</code> there once before relying on it.</p>
+  <div class="quiz" data-m="m8"></div>
+</section>
+
+<!-- ============ MODULE 9 ============ -->
+<section class="module" id="m9">
+  <div class="mhead"><p class="kick">Module 9 of 11</p><h2>The live demo</h2><p class="meta">10 min · interactive: terminal replay · checklist</p>
+    <p class="goal">By the end you can run the demo in front of an examiner, with their numbers, and say the right sentence at each step.</p></div>
+  <h3>Before the viva</h3>
+  <div id="pre-list">
+    <label class="check"><input type="checkbox"> Charge the laptop and test it on the presentation machine</label>
+    <label class="check"><input type="checkbox"> <code>git pull</code> so you have the latest <code>main</code></label>
+    <label class="check"><input type="checkbox"> <code>./scripts/xv6 clean</code> then <code>./scripts/xv6 check</code>: three PASS lines</label>
+    <label class="check"><input type="checkbox"> Close every other QEMU window: one guest at a time</label>
+    <label class="check"><input type="checkbox"> Keep a screen recording of a passing run as a backup</label>
+  </div>
+  <div class="sim" id="demo-sim">
+    <p class="st">Try it</p><h3>Replay of <code>vmdemo 7 3</code> (real output from the xv6 guest)</h3>
+    <div class="row"><button class="btn primary" type="button" id="demo-next">Next scene</button><button class="btn" type="button" id="demo-reset">Restart</button></div>
+    <div class="term"><div class="bar"><i></i><i></i><i></i>&nbsp;xv6 guest · QEMU serial console</div><pre id="demo-term" aria-live="polite"></pre></div>
+    <div class="verdict" id="demo-say"></div>
+  </div>
+  <h3>The commands</h3>
+  <div class="term"><div class="bar"><i></i><i></i><i></i>&nbsp;terminal</div><pre><span class="cmd">$ ./scripts/xv6 run</span>      # boots xv6; leave with Ctrl-A, then X
+<span class="cmd">$ vmdemo</span>                   # default: value 42, 2 pages
+<span class="cmd">$ vmdemo 1000 4</span>             # the examiner picks value and pages (1 to 16)
+<span class="cmd">$ vmtest</span>                   # all checks; ends with ALL PASSED
+<span class="cmd">$ echo still alive</span>         # the shell survived every faulting child</pre></div>
+  <div class="note good"><p class="t">Your opening, 30 seconds</p><p>"I added two system calls, <code>mprotect</code> and <code>munprotect</code>. They clear or set one bit, <code>PTE_W</code>, on a range of pages. The hardware enforces it. I validate first, change second, then flush the TLB, and I made the kernel's own writes respect it. Let me show it, and then I can walk through any block."</p></div>
+  <div class="tw"><table><tr><th>If this happens</th><th>Do this</th></tr>
+    <tr><td>Guest hangs, or <code>check</code> times out</td><td>Close the other QEMU, then <code>./scripts/xv6 clean</code></td></tr>
+    <tr><td><code>vmdemo: not found</code></td><td>Old disk image: <code>./scripts/xv6 clean</code> and run again</td></tr>
+    <tr><td>The Mac is slow</td><td>QEMU emulates x86 in software; wait</td></tr>
+    <tr><td>Stuck inside QEMU</td><td>Ctrl-A, then X</td></tr>
+    <tr><td>Nothing works</td><td>Play the backup recording</td></tr></table></div>
+</section>
+
+<!-- ============ MODULE 10 ============ -->
+<section class="module" id="m10">
+  <div class="mhead"><p class="kick">Module 10 of 11</p><h2>Change it yourself</h2><p class="meta">20 min · four exercises</p>
+    <p class="goal">Your professor wants you to modify the code without AI help. Do each exercise on paper or in the repo first. Open the hint only if stuck, the answer last. Revert with <code>git checkout -- .</code>.</p></div>
+  <p>The method is always the same: name the files and the function that control the behaviour, make the smallest change, rebuild with <code>./scripts/xv6 build</code>, test in the guest, then say why it works.</p>
+
+  <div class="ex" id="ex1"><h3>Exercise 1 · add <code>getprot(addr)</code></h3>
+  <p>Return <code>1</code> if the page holding <code>addr</code> is writable, <code>0</code> if read-only, <code>-1</code> if it is not a valid user page. Use number 24.</p>
+  <details><summary>Hint</summary><p>Copy the wiring of <code>mprotect</code>: <code>syscall.h</code>, <code>syscall.c</code> (extern and table), <code>usys.S</code>, <code>user.h</code>, <code>defs.h</code>. The helper walks the PTE with <code>walkpgdir(…, 0)</code> and tests <code>PTE_W</code>.</p></details>
+  <details class="sol"><summary>Answer</summary><figure class="code"><figcaption>video/examples/getprot_solution.c · lines 5–35</figcaption><pre tabindex="0"><code><span class="l"><i>5</i><b><span class="c1">// ---- vm.c: the helper that inspects the PTE ----</span></b></span><span class="l"><i>6</i><b><span class="kt">int</span></b></span><span class="l"><i>7</i><b><span class="n">getuvmprot</span><span class="p">(</span><span class="n">pde_t</span><span class="w"> </span><span class="o">*</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="n">uint</span><span class="w"> </span><span class="n">sz</span><span class="p">,</span><span class="w"> </span><span class="n">uint</span><span class="w"> </span><span class="n">va</span><span class="p">)</span></b></span><span class="l"><i>8</i><b><span class="p">{</span></b></span><span class="l"><i>9</i><b><span class="w">  </span><span class="n">pte_t</span><span class="w"> </span><span class="o">*</span><span class="n">pte</span><span class="p">;</span></b></span><span class="l"><i>10</i><b>&nbsp;</b></span><span class="l"><i>11</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">va</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">sz</span><span class="p">)</span><span class="w">                       </span><span class="c1">// outside the process</span></b></span><span class="l"><i>12</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>13</i><b><span class="w">  </span><span class="n">pte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">walkpgdir</span><span class="p">(</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">va</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w">   </span><span class="c1">// 0 = never allocate</span></b></span><span class="l"><i>14</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">pte</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">PTE_P</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">PTE_U</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>15</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span><span class="w">                       </span><span class="c1">// missing, not present, or kernel page</span></b></span><span class="l"><i>16</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">pte</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">PTE_W</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">     </span><span class="c1">// test the write bit only</span></b></span><span class="l"><i>17</i><b><span class="p">}</span></b></span><span class="l"><i>18</i><b>&nbsp;</b></span><span class="l"><i>19</i><b><span class="c1">// ---- sysproc.c: the syscall wrapper ----</span></b></span><span class="l"><i>20</i><b><span class="kt">int</span></b></span><span class="l"><i>21</i><b><span class="n">sys_getprot</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></b></span><span class="l"><i>22</i><b><span class="p">{</span></b></span><span class="l"><i>23</i><b><span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">addr</span><span class="p">;</span></b></span><span class="l"><i>24</i><b>&nbsp;</b></span><span class="l"><i>25</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">argint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">addr</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>26</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>27</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">getuvmprot</span><span class="p">(</span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">sz</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">uint</span><span class="p">)</span><span class="n">addr</span><span class="p">);</span></b></span><span class="l"><i>28</i><b><span class="p">}</span></b></span><span class="l"><i>29</i><b>&nbsp;</b></span><span class="l"><i>30</i><b><span class="c1">// ---- the wiring, same pattern as mprotect ----</span></b></span><span class="l"><i>31</i><b><span class="c1">// syscall.h : #define SYS_getprot 24</span></b></span><span class="l"><i>32</i><b><span class="c1">// syscall.c : extern int sys_getprot(void);   and   [SYS_getprot] sys_getprot,</span></b></span><span class="l"><i>33</i><b><span class="c1">// usys.S    : SYSCALL(getprot)</span></b></span><span class="l"><i>34</i><b><span class="c1">// user.h    : int getprot(void*);</span></b></span><span class="l"><i>35</i><b><span class="c1">// defs.h    : int getuvmprot(pde_t*, uint, uint);</span></b></span></code></pre></figure>
+  <p>Tested in the guest with the other exercises applied:</p><div class="term"><pre>modtest
+getprot(p) before          = 1
+mprotect(p, 5000) bytes    = 0
+getprot(p), getprot(p+4096) = 0 0   (both pages protected)
+getprot(0x80000000)        = -1   (kernel address)
+munprotect(p, 1) bytes     = 0
+getprot(p), getprot(p+4096) = 1 0   (only first page restored)
+child now writes the read-only page:
+pid 4 modtest: write to read-only page 0x3000
+pid 4 modtest: trap 14 err 7 on cpu 0 eip 0x112 addr 0x3000--kill proc
+parent still running
+$ </pre></div></details>
+  <button class="btn" type="button" data-done="ex1">I did this one</button></div>
+
+  <div class="ex" id="ex2"><h3>Exercise 2 · make <code>len</code> a count of bytes</h3>
+  <p><code>mprotect(p, 5000)</code> should protect two pages (round up). Zero and negative lengths are still invalid.</p>
+  <details><summary>Hint</summary><p>Only <code>changeprotection()</code> in <code>sysproc.c</code> changes. Convert bytes to pages before calling the helper, and avoid adding 4095 to a possibly huge number.</p></details>
+  <details class="sol"><summary>Answer</summary><figure class="code"><figcaption>video/examples/bytes_solution.c · lines 5–23</figcaption><pre tabindex="0"><code><span class="l"><i>5</i><b><span class="c1">// ---- sysproc.c: only changeprotection() changes ----</span></b></span><span class="l"><i>6</i><b><span class="k">static</span><span class="w"> </span><span class="kt">int</span></b></span><span class="l"><i>7</i><b><span class="n">changeprotection</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">writable</span><span class="p">)</span></b></span><span class="l"><i>8</i><b><span class="p">{</span></b></span><span class="l"><i>9</i><b><span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">;</span></b></span><span class="l"><i>10</i><b><span class="w">  </span><span class="k">struct</span><span class="w"> </span><span class="nc">proc</span><span class="w"> </span><span class="o">*</span><span class="n">curproc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">myproc</span><span class="p">();</span></b></span><span class="l"><i>11</i><b>&nbsp;</b></span><span class="l"><i>12</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">argint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">addr</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">argint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span></b></span><span class="l"><i>13</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>14</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">len</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w">                    </span><span class="c1">// still reject zero and negative</span></b></span><span class="l"><i>15</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>16</i><b><span class="w">  </span><span class="n">len</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">len</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">PGSIZE</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">   </span><span class="c1">// bytes -&gt; pages, rounded up</span></b></span><span class="l"><i>17</i><b><span class="w">                                  </span><span class="c1">// (never computes len + 4095, so no overflow)</span></b></span><span class="l"><i>18</i><b><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">setuvmwrite</span><span class="p">(</span><span class="n">curproc</span><span class="o">-&gt;</span><span class="n">pgdir</span><span class="p">,</span><span class="w"> </span><span class="n">curproc</span><span class="o">-&gt;</span><span class="n">sz</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">uint</span><span class="p">)</span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="n">writable</span><span class="p">);</span></b></span><span class="l"><i>19</i><b><span class="p">}</span></b></span><span class="l"><i>20</i><b>&nbsp;</b></span><span class="l"><i>21</i><b><span class="c1">// Results: mprotect(p, 5000) protects two pages (p and p+4096),</span></b></span><span class="l"><i>22</i><b><span class="c1">// munprotect(p, 1) unprotects only the page at p.</span></b></span><span class="l"><i>23</i><b><span class="c1">// Some vmtest cases assume page counts, so they would now fail.</span></b></span></code></pre></figure>
+  <p>Which existing tests would now fail, and why? Any that pass a page count such as <code>mprotect(p, 3)</code>. They assumed pages.</p></details>
+  <button class="btn" type="button" data-done="ex2">I did this one</button></div>
+
+  <div class="ex" id="ex3"><h3>Exercise 3 · a clearer message on a write fault</h3>
+  <p>When a user process writes a read-only page, print <code>pid N name: write to read-only page 0x…</code> before the usual trap line.</p>
+  <details><summary>Hint</summary><p>The place is <code>trap.c</code>, user-space branch of the default case. Test for trap 14 with the error bits present, write and user.</p></details>
+  <details class="sol"><summary>Answer</summary><figure class="code"><figcaption>video/examples/fault_message_solution.c · lines 5–18</figcaption><pre tabindex="0"><code><span class="l"><i>5</i><b><span class="c1">// ---- trap.c: inside the default case, user-space branch ----</span></b></span><span class="l"><i>6</i><b><span class="w">    </span><span class="c1">// New lines go BEFORE the existing cprintf of the generic message.</span></b></span><span class="l"><i>7</i><b><span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">trapno</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">T_PGFLT</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="p">(</span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">err</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">   </span><span class="c1">// present + write + user</span></b></span><span class="l"><i>8</i><b><span class="w">      </span><span class="n">cprintf</span><span class="p">(</span><span class="s">"pid %d %s: write to read-only page 0x%x</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span></b></span><span class="l"><i>9</i><b><span class="w">              </span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">pid</span><span class="p">,</span><span class="w"> </span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">PGROUNDDOWN</span><span class="p">(</span><span class="n">rcr2</span><span class="p">()));</span></b></span><span class="l"><i>10</i><b><span class="w">    </span><span class="c1">// In user space, assume process misbehaved.</span></b></span><span class="l"><i>11</i><b><span class="w">    </span><span class="n">cprintf</span><span class="p">(</span><span class="s">"pid %d %s: trap %d err %d on cpu %d "</span></b></span><span class="l"><i>12</i><b><span class="w">            </span><span class="s">"eip 0x%x addr 0x%x--kill proc</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span></b></span><span class="l"><i>13</i><b><span class="w">            </span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">pid</span><span class="p">,</span><span class="w"> </span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">trapno</span><span class="p">,</span></b></span><span class="l"><i>14</i><b><span class="w">            </span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">err</span><span class="p">,</span><span class="w"> </span><span class="n">cpuid</span><span class="p">(),</span><span class="w"> </span><span class="n">tf</span><span class="o">-&gt;</span><span class="n">eip</span><span class="p">,</span><span class="w"> </span><span class="n">rcr2</span><span class="p">());</span></b></span><span class="l"><i>15</i><b><span class="w">    </span><span class="n">myproc</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">killed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span></b></span><span class="l"><i>16</i><b>&nbsp;</b></span><span class="l"><i>17</i><b><span class="c1">// rcr2() returns the faulting address. PGROUNDDOWN comes from mmu.h.</span></b></span><span class="l"><i>18</i><b><span class="c1">// Bits of err: 1 = page was present, 2 = it was a write, 4 = user mode.</span></b></span></code></pre></figure>
+  <p>Real output with the change applied: <code>pid 4 modtest: write to read-only page 0x3000</code> then the usual <code>trap 14 err 7</code> line, and the parent keeps running.</p></details>
+  <button class="btn" type="button" data-done="ex3">I did this one</button></div>
+
+  <div class="ex" id="ex4"><h3>Exercise 4 · refuse page 0, and allow at most 16 pages per call</h3>
+  <details><summary>Hint</summary><p>Both rules belong in the first check of the shared helper, so they apply to both calls. Only a range that starts at address 0 can include page 0.</p></details>
+  <details class="sol"><summary>Answer</summary><figure class="code"><figcaption>video/examples/limits_solution.c · lines 5–14</figcaption><pre tabindex="0"><code><span class="l"><i>5</i><b><span class="c1">// ---- vm.c, setuvmwrite(): only the FIRST check changes ----</span></b></span><span class="l"><i>6</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">va</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">PGSIZE</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">npages</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">sz</span><span class="p">)</span><span class="w">        </span><span class="c1">// before</span></b></span><span class="l"><i>7</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>8</i><b>&nbsp;</b></span><span class="l"><i>9</i><b><span class="w">  </span><span class="k">if</span><span class="p">(</span><span class="n">va</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">PGSIZE</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">npages</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">npages</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">16</span><span class="w">      </span><span class="c1">// cap: at most 16 pages</span></b></span><span class="l"><i>10</i><b><span class="w">     </span><span class="o">||</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">sz</span><span class="p">)</span><span class="w">                             </span><span class="c1">// refuse page 0</span></b></span><span class="l"><i>11</i><b><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span></b></span><span class="l"><i>12</i><b>&nbsp;</b></span><span class="l"><i>13</i><b><span class="c1">// Both rules apply to mprotect AND munprotect, because they share this helper.</span></b></span><span class="l"><i>14</i><b><span class="c1">// The range always starts at va, so va == 0 is the only way to include page 0.</span></b></span></code></pre></figure>
+  <div class="term"><pre>limtest
+mprotect(0, 1)          = -1   (page 0 refused)
+mprotect(p, 16)         = 0   (16 pages allowed)
+mprotect(p, 17)         = -1   (over the cap)
+munprotect(p, 16)       = 0
+munprotect(p, 17)       = -1   (same cap)</pre></div></details>
+  <button class="btn" type="button" data-done="ex4">I did this one</button></div>
+
+  <div class="note"><p class="t">More to practise on paper</p><p>Kill the caller instead of returning <code>-1</code> when <code>read()</code> targets a protected page. Return how many pages changed. Protect from an address to the end of the heap. For each: which file, which line, which test?</p></div>
+</section>
+
+<!-- ============ MODULE 11 ============ -->
+<section class="module" id="m11">
+  <div class="mhead"><p class="kick">Module 11 of 11</p><h2>Viva drill</h2><p class="meta">15 min · twelve flashcards</p>
+    <p class="goal">Say the answer aloud before you reveal it. Mark a card "knew it" only if you got the key point. Mark all twelve to finish.</p></div>
+  <div class="dots" id="fc-dots" aria-hidden="true"></div>
+  <div class="fc" id="fc"></div>
+  <div class="row" style="margin-top:1rem"><button class="btn" type="button" id="fc-shuffle">Shuffle</button><span class="qstat" id="fc-stat"></span></div>
+  <div class="done-banner" id="done-banner"><h3>All bits set.</h3><p>Every module is complete. Now rewrite <code>setuvmwrite()</code> from memory on paper, then rehearse the demo on the machine you will present on. When you can do both and explain every line, you own this code.</p></div>
+</section>
+
+<footer>Built from the <code>os-project</code> repository (branch <code>main</code>). The code and terminal output are read from the real files and captured runs. Progress is stored only in this browser.</footer>
+</main>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s,c){return (c||document).querySelector(s)};
+var $$=function(s,c){return Array.prototype.slice.call((c||document).querySelectorAll(s))};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function hex(n,w){var s=(n>>>0).toString(16).toUpperCase();while(s.length<w)s='0'+s;return '0x'+s}
+function bin(n,w){var s=(n>>>0).toString(2);while(s.length<w)s='0'+s;return s}
+function parseNum(s){
+  s=String(s).trim(); var neg=false;
+  if(s.charAt(0)==='-'){neg=true;s=s.slice(1).trim()}
+  var v;
+  if(/^0x[0-9a-f]+$/i.test(s)) v=parseInt(s.slice(2),16);
+  else if(/^\d+$/.test(s)) v=parseInt(s,10);
+  else return NaN;
+  return neg?-v:v;
+}
+
+/* ---------- progress, theme, navigation ---------- */
+var MODS=[['m1','The problem'],['m2','Addresses and pages'],['m3','The permission bits'],['m4','TLB, WP and the fault'],['m5','The solution map'],
+  ['m6','setuvmwrite, line by line'],['m7','The kernel’s blind spot'],['m8','Proving it works'],['m9','The live demo'],['m10','Change it yourself'],['m11','Viva drill']];
+var KEY='xv6course:v1', state={done:{},cards:{},ex:{},pre:{},theme:''};
+try{var raw=localStorage.getItem(KEY); if(raw){var o=JSON.parse(raw); for(var k in o) state[k]=o[k];}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+function complete(id){ if(!state.done[id]){state.done[id]=true;save();} paint(); }
+function paint(){
+  var n=0,bits=$('#bits'); bits.innerHTML='';
+  MODS.forEach(function(m,i){var d=!!state.done[m[0]]; if(d)n++; var b=document.createElement('span'); b.className='bit'+(d?' on':''); b.textContent=d?'1':'0'; bits.appendChild(b);
+    var a=$('#nav-'+m[0]); if(a){a.classList.toggle('done',d); $('.ck',a).textContent=d?'1':'0';}});
+  $('#regtxt').textContent='PTE_W = '+(n===MODS.length?'1':'0')+' · '+n+'/'+MODS.length;
+  bits.setAttribute('aria-label',n+' of '+MODS.length+' modules complete');
+  $('#done-banner').classList.toggle('show',n===MODS.length);
+}
+(function buildNav(){
+  var side=$('#side'),jump=$('#jump');
+  MODS.forEach(function(m,i){
+    var a=document.createElement('a'); a.href='#'+m[0]; a.id='nav-'+m[0];
+    a.innerHTML='<span class="n">'+(i+1)+'</span><span>'+esc(m[1])+'</span><span class="ck">0</span>'; side.appendChild(a);
+    var o=document.createElement('option'); o.value=m[0]; o.textContent=(i+1)+'. '+m[1]; jump.appendChild(o);
+  });
+  jump.addEventListener('change',function(){ var t=document.getElementById(jump.value); if(t) t.scrollIntoView(); try{history.replaceState(null,'','#'+jump.value)}catch(e){} });
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){ $$('.side a').forEach(function(x){x.classList.remove('cur')}); var a=$('#nav-'+e.target.id); if(a)a.classList.add('cur'); jump.value=e.target.id; }})},{rootMargin:'-20% 0px -70% 0px'});
+    MODS.forEach(function(m){io.observe(document.getElementById(m[0]))});
+  }
+})();
+function applyTheme(){var r=document.documentElement; if(state.theme) r.setAttribute('data-theme',state.theme); else r.removeAttribute('data-theme');}
+$('#theme').addEventListener('click',function(){
+  var cur=state.theme||(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  state.theme=cur==='dark'?'light':'dark'; applyTheme(); save();
+});
+applyTheme();
+
+/* ---------- quizzes ---------- */
+var QUIZ={
+m1:[{q:'In mprotect(addr, len), what does len count?',o:['Bytes','Pages','Words','Page tables'],a:1,w:'Pages. A page is 4096 bytes on x86.'},
+    {q:'A child process writes to a protected page. What must happen?',o:['The whole machine panics','Only the child is killed; the parent keeps running','The write silently succeeds','The kernel unprotects the page'],a:1,w:'The fault happens in the child’s user mode, so only the child is killed.'}],
+m2:[{q:'For the address 0x00403010, what is the page directory index (PDX)?',o:['0','1','3','4'],a:1,w:'0x403010 is just past 4 MiB (0x400000), so the top 10 bits are 1. Try it in the splitter.'},
+    {q:'Which address is page-aligned?',o:['0x5001','0x5ff0','0x5000','0x4fff'],a:2,w:'A page-aligned address has offset 0, so its low 12 bits are zero.'}],
+m3:[{q:'Which statement clears only the write bit?',o:['*pte &= ~PTE_W;','*pte &= PTE_W;','*pte |= PTE_W;','*pte = 0;'],a:0,w:'AND with the inverse of the mask clears that bit and keeps all others.'},
+    {q:'What error code does a user write to a present, read-only page give?',o:['4','5','6','7'],a:3,w:'1 (present) + 2 (write) + 4 (user) = 7. Check it in the PTE lab.'}],
+m4:[{q:'Why does setuvmwrite reload CR3 after changing PTEs?',o:['To make the kernel faster','To flush cached translations that still say the page is writable','To allocate a new page table','To switch to kernel mode'],a:1,w:'The TLB caches permissions, so without the reload a stale writable entry could let a write through.'},
+    {q:'What does CR0.WP change?',o:['User code obeys read-only pages','Kernel-mode writes also obey read-only pages','Paging is turned off','The TLB is disabled'],a:1,w:'With WP set, even the kernel faults on a write to a read-only page. xv6 sets it.'}],
+m5:[{q:'Which file holds the table that maps system-call numbers to handlers?',o:['usys.S','sysproc.c','syscall.c','user.h'],a:2,w:'syscall.c: the syscalls[] table and the syscall() dispatcher.'},
+    {q:'How does the return value get back to the user program?',o:['Through a global variable','Through EAX in the trap frame','Through the page table','Through a pipe'],a:1,w:'syscall() stores the handler’s result into tf->eax, which the user stub returns.'}],
+m6:[{q:'Why does setuvmwrite compare npages with (sz - va) / PGSIZE?',o:['It is faster','It avoids a 32-bit overflow in va + npages * 4096','It checks alignment','It allocates pages'],a:1,w:'The product can wrap to a small number that would pass a naive check.'},
+    {q:'Why is V2P needed in lcr3(V2P(pgdir))?',o:['pgdir is a user address','CR3 holds a physical address and pgdir is a kernel virtual one','To flush the cache','It is not needed'],a:1,w:'The CPU needs the physical address of the page directory.'}],
+m7:[{q:'Why is write() allowed to read from a protected buffer?',o:['It is a bug','The kernel only reads the buffer, so nothing is modified','Protection does not apply to files','CR0.WP is off for write'],a:1,w:'Read-only pages may be read. Only destinations the kernel writes into need the new check.'},
+    {q:'Why did copyout need a check?',o:['It is called by every syscall','It writes through the kernel’s always-writable mapping and would bypass user permissions','It frees pages','It handles faults'],a:1,w:'The kernel alias of the physical page is writable even if the user mapping is not.'}],
+m8:[{q:'Why do the tests use a pipe instead of wait()?',o:['Pipes are faster','xv6’s wait() returns no exit status','wait() is unsafe','Pipes survive crashes'],a:1,w:'A marker byte through a pipe shows whether the write succeeded.'},
+    {q:'What does the immediate-effect test prove?',o:['The page is aligned','mprotect flushes the TLB, so a cached writable entry cannot let a write through','fork works','The pipe is open'],a:1,w:'It writes first (caching), then mprotects and writes again with no context switch. Without lcr3 the second write would succeed.'}]
+};
+function renderQuiz(box){
+  var id=box.getAttribute('data-m'), qs=QUIZ[id]; if(!qs) return;
+  var got=0, html='<h3>Checkpoint</h3>';
+  qs.forEach(function(q,qi){
+    html+='<div class="q" data-qi="'+qi+'"><p class="qq">'+esc(q.q)+'</p><div class="opts">';
+    q.o.forEach(function(o,oi){html+='<button type="button" class="opt" data-oi="'+oi+'"><span class="lt">'+String.fromCharCode(65+oi)+'</span><span>'+esc(o)+'</span></button>'});
+    html+='</div><div class="fb"></div></div>';
+  });
+  html+='<div class="qstat"></div>'; box.innerHTML=html;
+  function stat(){ $('.qstat',box).textContent=got+' of '+qs.length+' answered correctly'+(got===qs.length?' — module complete':''); }
+  if(state.done[id]){got=qs.length; $$('.q',box).forEach(function(qb,qi){ var q=qs[qi]; $$('.opt',qb)[q.a].classList.add('good'); $$('.opt',qb).forEach(function(b){b.disabled=true}); $('.fb',qb).textContent=q.w; $('.fb',qb).className='fb good'; });}
+  stat();
+  box.addEventListener('click',function(e){
+    var b=e.target.closest('.opt'); if(!b||b.disabled) return;
+    var qb=b.closest('.q'), q=qs[+qb.getAttribute('data-qi')], fb=$('.fb',qb), pick=+b.getAttribute('data-oi');
+    if(pick===q.a){ b.classList.add('good'); fb.textContent='Correct. '+q.w; fb.className='fb good'; $$('.opt',qb).forEach(function(x){x.disabled=true}); got++; stat(); if(got===qs.length) complete(id); }
+    else { b.classList.add('wrong'); b.disabled=true; fb.textContent='Not quite. Think again and pick another.'; fb.className='fb wrong'; }
+  });
+}
+$$('.quiz').forEach(renderQuiz);
+
+/* ---------- module 2: address splitter ---------- */
+(function(){
+  var inp=$('#addr-in'), out=$('#addr-out');
+  function go(){
+    var v=parseNum(inp.value);
+    if(isNaN(v)||v<0||v>0xFFFFFFFF){out.innerHTML='<div class="verdict bad">Enter a hex address like 0x00404010 (up to 32 bits).</div>';return;}
+    var a=v>>>0, b=bin(a,32), pdx=(a>>>22)&0x3ff, ptx=(a>>>12)&0x3ff, off=a&0xfff;
+    out.innerHTML='<div class="segs"><div class="seg a"><div class="bin">'+b.slice(0,10)+'</div><div class="nm">PDX</div><div class="v">'+pdx+'</div></div>'+
+      '<div class="seg b"><div class="bin">'+b.slice(10,20)+'</div><div class="nm">PTX</div><div class="v">'+ptx+'</div></div>'+
+      '<div class="seg c"><div class="bin">'+b.slice(20)+'</div><div class="nm">offset</div><div class="v">'+hex(off,3)+'</div></div></div>'+
+      '<dl class="kv"><dt>page number</dt><dd>'+hex(a>>>12,5)+' ('+(a>>>12)+')  = address / 4096</dd><dt>page starts at</dt><dd>'+hex(a&~0xfff,8)+'  (PGROUNDDOWN)</dd>'+
+      '<dt>page-aligned?</dt><dd>'+(off===0?'<span class="pill ok">yes</span>':'<span class="pill warn">no: mprotect would return -1</span>')+'</dd>'+
+      '<dt>region</dt><dd>'+(a>=0x80000000?'<span class="pill bad">kernel address: rejected by our helper</span>':'<span class="pill info">user address</span>')+'</dd></dl>';
+  }
+  inp.addEventListener('input',go);
+  $$('button[data-a]',$('#addr-sim')).forEach(function(b){b.addEventListener('click',function(){inp.value=b.getAttribute('data-a');go()})});
+  go();
+})();
+
+/* ---------- module 3: PTE lab ---------- */
+(function(){
+  var P=$('#pte-p'),W=$('#pte-w'),U=$('#pte-u'),WP=$('#pte-wp'),op=$('#pte-op');
+  function pte(){return ((0x123<<12)|(U.checked?4:0)|(W.checked?2:0)|(P.checked?1:0))>>>0}
+  function draw(){
+    var v=pte(),h='';
+    for(var i=31;i>=0;i--){var on=(v>>>i)&1, cls=i>=12?'addr':(on?'on':''); if(i===1)cls+=' w'; if(i>=12){h+='<span class="addr">'+on+'</span>'} else {h+='<span class="'+cls+'" title="bit '+i+'">'+on+'</span>'}}
+    $('#pte-bits').innerHTML=h; $('#pte-hex').textContent=hex(v,8);
+    var p=P.checked,w=W.checked,u=U.checked,wp=WP.checked;
+    function res(id,ok,msg,eid,err){$(id).innerHTML='<span class="pill '+(ok?'ok':'bad')+'">'+msg+'</span>';$(eid).innerHTML=err}
+    if(!p) res('#r-ur',false,'page fault','#e-ur','trap 14 err 4 (not present, read, user)');
+    else if(!u) res('#r-ur',false,'page fault','#e-ur','trap 14 err 5 (present, user mode, supervisor-only page)');
+    else res('#r-ur',true,'reads the value','#e-ur','nothing: no fault');
+    if(!p) res('#r-uw',false,'page fault','#e-uw','trap 14 err 6 (not present, write, user)');
+    else if(!u||!w) res('#r-uw',false,'page fault: process killed','#e-uw','trap 14 err 7 (present + write + user)');
+    else res('#r-uw',true,'write succeeds','#e-uw','nothing: no fault');
+    if(!p) $('#r-kw').innerHTML='<span class="pill bad">kernel fault: panic</span>',$('#e-kw').textContent='trap 14 in kernel mode';
+    else if(!w&&wp) $('#r-kw').innerHTML='<span class="pill bad">kernel fault: panic</span>',$('#e-kw').textContent='trap 14 in kernel mode (this is the Module 7 crash)';
+    else if(!w&&!wp) $('#r-kw').innerHTML='<span class="pill warn">write goes through</span>',$('#e-kw').textContent='WP is off, so read-only is ignored in kernel mode';
+    else $('#r-kw').innerHTML='<span class="pill ok">write succeeds</span>',$('#e-kw').textContent='nothing: no fault';
+  }
+  [P,W,U,WP].forEach(function(c){c.addEventListener('change',function(){op.textContent='flag changed by hand';draw()})});
+  $('#pte-mp').addEventListener('click',function(){W.checked=false;op.textContent='*pte &= ~PTE_W  →  '+hex(pte(),8);draw()});
+  $('#pte-mu').addEventListener('click',function(){W.checked=true;op.textContent='*pte |= PTE_W  →  '+hex(pte(),8);draw()});
+  draw();
+})();
+
+/* ---------- module 4: TLB stepper and error decoder ---------- */
+(function(){
+  var step=0,fl=$('#tlb-flush'),flow=$('#tlb-flow'),say=$('#tlb-say');
+  function draw(){
+    var flush=fl.checked, tlb,pt,cpu,msg,cls='';
+    var cached=step>=1&&!(step>=3&&flush);
+    var pw=step<2;
+    cpu='<div class="box on"><h5>CPU</h5><small>'+(step===1?'writes page 0x4000':step===4?'writes page 0x4000 again':'idle')+'</small></div>';
+    tlb='<div class="box '+(cached?(step>=2?'warn':'good'):'dim')+'"><h5>TLB</h5><small>'+(cached?'0x4000 → writable':'empty')+(cached&&step>=2?'  (STALE)':'')+'</small></div>';
+    pt='<div class="box '+(pw?'good':'bad')+'"><h5>Page table</h5><small>PTE_W = '+(pw?1:0)+'</small></div>';
+    flow.innerHTML=cpu+'<div class="ar">→</div>'+tlb+'<div class="ar">→</div>'+pt;
+    var m=['Start: the page is writable and the TLB is empty.','The process writes the page. The CPU caches 0x4000 → writable in the TLB.',
+      'mprotect clears PTE_W in the page table. The TLB still says writable: it is now stale.',
+      flush?'setuvmwrite reloads CR3, which empties the TLB.':'No reload: the TLB keeps the stale entry.',null];
+    if(step<4){msg=m[step];cls=''}
+    else if(flush){msg='The CPU misses in the TLB, reads the page table, sees PTE_W = 0 and raises trap 14 err 7. Protected.';cls='ok'}
+    else {msg='The TLB hit says "writable", so the write goes through. The page is not protected. This is the bug our test catches.';cls='bad'}
+    say.className='verdict '+cls; say.textContent=msg;
+    $('#tlb-next').disabled=step>=4;
+  }
+  $('#tlb-next').addEventListener('click',function(){if(step<4){step++;draw()}});
+  $('#tlb-reset').addEventListener('click',function(){step=0;draw()});
+  fl.addEventListener('change',function(){if(step>=3)step=3;draw()});
+  draw();
+  var p=$('#err-p'),w=$('#err-w'),u=$('#err-u'),eo=$('#err-out');
+  function ed(){
+    var e=(p.checked?1:0)|(w.checked?2:0)|(u.checked?4:0), t=[];
+    t.push(u.checked?'a user-mode':'a kernel-mode'); t.push(w.checked?'write':'read'); t.push(p.checked?'to a present page that refused it (a protection violation)':'to a page that is not present');
+    var cls='', extra='';
+    if(e===7){cls='ok';extra=' This is our protection firing.'} else if(!u.checked){cls='bad';extra=' A fault in kernel mode makes xv6 call panic.'}
+    eo.className='verdict '+cls; eo.innerHTML='<span class="pill info">err '+e+'</span><span>trap 14 err '+e+': '+t.join(' ')+'.'+extra+'</span>';
+  }
+  [p,w,u].forEach(function(c){c.addEventListener('change',ed)}); ed();
+})();
+
+/* ---------- module 5: call tracer ---------- */
+(function(){
+  var names=['Program','Stub','Dispatch','Handler','Helper','Return'], tabs=$('#trace-tabs'), cur=1;
+  names.forEach(function(n,i){var b=document.createElement('button');b.type='button';b.setAttribute('role','tab');b.textContent=(i+1)+'. '+n;b.addEventListener('click',function(){show(i+1)});tabs.appendChild(b)});
+  function show(n){cur=n;$$('button',tabs).forEach(function(b,i){b.setAttribute('aria-selected',i+1===n?'true':'false')});$$('.stn',$('#trace-body')).forEach(function(s){s.classList.toggle('show',+s.getAttribute('data-t')===n)})}
+  show(1);
+})();
+
+/* ---------- module 6: overflow calculator and two-pass simulator ---------- */
+(function(){
+  var va=$('#o-va'),np=$('#o-np'),sz=$('#o-sz'),out=$('#o-out');
+  function go(){
+    var a=parseNum(va.value),n=parseNum(np.value),s=parseNum(sz.value);
+    if([a,n,s].some(isNaN)){out.innerHTML='<div class="verdict bad">Use hex (0x1000), decimal, or a negative number.</div>';return}
+    a=a>>>0; s=s>>>0; var ni=n|0, nu=ni>>>0;
+    var prod=Math.imul(ni,4096)>>>0, end=(a+prod)>>>0, naive=end<=s;
+    var ours,why;
+    if(a%4096!==0){ours=false;why='start is not page-aligned'}
+    else if(ni<=0){ours=false;why='count is zero or negative'}
+    else if(a>=s){ours=false;why='start is outside the process'}
+    else if(nu>Math.floor((s-a)/4096)){ours=false;why='count '+nu+' is more than the '+Math.floor((s-a)/4096)+' pages that fit'}
+    else {ours=true;why='count fits: '+nu+' ≤ '+Math.floor((s-a)/4096)}
+    var wrong=(naive!==ours&&naive);
+    out.innerHTML='<dl class="kv"><dt>npages × 4096</dt><dd>'+hex(prod,8)+(ni>0&&prod/4096!==ni?'  <span class="pill bad">wrapped past 2^32</span>':'')+'</dd>'+
+      '<dt>end = va + product</dt><dd>'+hex(end,8)+'</dd><dt>naive: end ≤ sz ?</dt><dd>'+(naive?'<span class="pill '+(wrong?'bad':'ok')+'">accepts'+(wrong?' (WRONG)':'')+'</span>':'<span class="pill ok">rejects</span>')+'</dd>'+
+      '<dt>ours: compare counts</dt><dd>'+(ours?'<span class="pill ok">accepts</span>':'<span class="pill ok">rejects</span>')+' — '+esc(why)+'</dd></dl>'+
+      (wrong?'<div class="verdict bad">The naive check accepts a range that is far larger than the process. Comparing counts rejects it.</div>':'');
+  }
+  [va,np,sz].forEach(function(i){i.addEventListener('input',go)});
+  $$('button[data-p]',$('#ovf-sim')).forEach(function(b){b.addEventListener('click',function(){var p=b.getAttribute('data-p').split('|');va.value=p[0];np.value=p[1];sz.value=p[2];go()})});
+  go();
+
+  var pages=[],bad=4,box=$('#two-pages'),res=$('#two-out');
+  function reset(){pages=[0,0,0,0,0];res.className='verdict';res.textContent='Choose a mode and run it.';draw()}
+  function draw(){
+    box.innerHTML='';
+    for(var i=0;i<5;i++){(function(i){var b=document.createElement('button');b.type='button';b.className='pg'+(pages[i]?' ro':'')+(i===bad?' inv':'');b.setAttribute('aria-pressed',i===bad?'true':'false');
+      b.innerHTML='page '+i+'<b>'+(i===bad?'invalid':pages[i]?'read-only':'writable')+'</b>';b.addEventListener('click',function(){bad=(bad===i)?-1:i;reset()});box.appendChild(b)})(i)}
+  }
+  $('#two-reset').addEventListener('click',reset);
+  $('#two-run').addEventListener('click',function(){
+    var mode=$('input[name=two-mode]:checked').value;
+    if(mode==='one'){
+      var changed=0; for(var i=0;i<5;i++){ if(i===bad){break} pages[i]=1; changed++; }
+      var failed=bad>=0; draw();
+      if(failed){res.className='verdict bad';res.innerHTML='<span class="pill bad">returned -1</span> <span>but pages 0–'+(changed-1)+' are now read-only. The call failed and still changed things.</span>'}
+      else {res.className='verdict ok';res.textContent='All five pages protected, returned 0.'}
+    } else {
+      if(bad>=0){draw();res.className='verdict ok';res.innerHTML='<span class="pill ok">returned -1</span> <span>Pass one found the bad page before changing anything. Nothing was touched.</span>'}
+      else {pages=[1,1,1,1,1];draw();res.className='verdict ok';res.textContent='Pass one accepted all five, pass two protected them, returned 0.'}
+    }
+  });
+  reset();
+})();
+
+/* ---------- module 7: syscall simulator ---------- */
+(function(){
+  var call=$('#kb-call'),pg=$('#kb-page'),fix=$('#kb-fix'),out=$('#kb-out');
+  function go(){
+    var c=call.value,ro=pg.value==='ro',f=fix.checked,writes=c!=='write',cls,html;
+    if(!writes){cls='ok';html='<span class="pill ok">works</span><span>The kernel only reads the buffer, so a protected page is a valid source. This is why <code>sys_write</code> keeps plain <code>argptr</code>.</span>'}
+    else if(!ro){cls='ok';html='<span class="pill ok">works</span><span>The buffer is writable, so the kernel writes into it normally.</span>'}
+    else if(f){cls='ok';html='<span class="pill ok">returns -1</span><span><code>argptrw</code> calls <code>checkuvmwrite</code>, sees the read-only page and refuses before any write. The page is untouched and the kernel keeps running.</span>'}
+    else {cls='bad';html='<span class="pill bad">KERNEL PANIC</span><span><code>unexpected trap 14 from cpu 0 eip 80103743 (cr2=0x5000)</code> then <code>panic: trap</code>. The kernel wrote into a read-only page with CR0.WP set. This is the crash we reproduced before the fix.</span>'}
+    out.className='verdict '+cls; out.innerHTML=html;
+  }
+  [call,pg,fix].forEach(function(e){e.addEventListener('change',go)}); go();
+})();
+
+/* ---------- module 8: mutation lab and bug hunt ---------- */
+(function(){
+  var MUT=[
+   {n:'Delete the lcr3 line',code:'vm.c line 351:  lcr3(V2P(pgdir));   // deleted',status:'ok',st:'Verified by running it',
+    res:'$ ./scripts/xv6 smoke\nPASS: xv6 boot, shell command and upstream forktest\nFAIL: vmtest reported a failure; inspect artifacts/*.log\n\n$ grep FAIL artifacts/smoke.log\nvmtest: FAIL mprotect takes effect immediately (TLB refreshed)\nvmtest: 1 FAILED',
+    why:'Only the immediate-effect test notices. Every other protected write happens in a freshly forked child, and a context switch reloads CR3 for it. We added this test because the first version of the suite missed the bug.'},
+   {n:'Merge the two passes',code:'Change the PTE inside the pass-1 loop and drop pass 2',status:'ok',st:'Verified by running it',
+    res:'FAIL: vmtest reported a failure; inspect artifacts/*.log\n(the rejected guard-page range left the page before it read-only, and the test program was then killed)',
+    why:'The atomic-rejection tests catch it. A range that ends in the guard page must change nothing, and here it changed the earlier pages.'},
+   {n:'Use argptr in sys_read',code:'sysfile.c line 76:  argptr(1, &p, n)   // instead of argptrw',status:'ok',st:'Verified: this was the original bug',
+    res:'unexpected trap 14 from cpu 0 eip 80103743 (cr2=0x5000)\nlapicid 0: panic: trap',
+    why:'The kernel-buffer test reproduces the crash. Read into a protected page makes the kernel itself fault.'},
+   {n:'Drop the PTE_U check',code:'vm.c line 337:  remove  || (*pte & PTE_U) == 0',status:'warn',st:'Predicted, not run',
+    res:'Expected: the "stack guard page rejected" checks in the invalid group fail,\nbecause the guard page is no longer refused.',
+    why:'The guard page has PTE_U cleared by exec. Without the user-bit check, our helper would accept it. Try it yourself and confirm.'}];
+  var tabs=$('#mut-tabs'),out=$('#mut-out');
+  MUT.forEach(function(m,i){var b=document.createElement('button');b.type='button';b.textContent=m.n;b.addEventListener('click',function(){show(i)});tabs.appendChild(b)});
+  function show(i){var m=MUT[i];$$('button',tabs).forEach(function(b,j){b.setAttribute('aria-selected',j===i?'true':'false')});
+    out.innerHTML='<p><b>Change:</b> <code>'+esc(m.code)+'</code></p><p><span class="pill '+m.status+'">'+m.st+'</span></p><div class="term"><pre>'+esc(m.res)+'</pre></div><p>'+esc(m.why)+'</p>'}
+  show(0);
+
+  var BUGS=[
+   {q:'This version of the range check has a bug. Which line?',lines:['if(va % PGSIZE != 0 || npages <= 0 || va >= sz)','  return -1;','end = va + npages * PGSIZE;','if(end > sz)','  return -1;'],a:2,
+    w:'It multiplies before checking, so npages * 4096 can wrap to a small number and the check passes. Compare the page count with (sz - va) / PGSIZE instead.'},
+   {q:'This version of checkuvmwrite has a bug. Which line?',lines:['pte = walkpgdir(pgdir, (void*)a, 0);','if(pte == 0 || (*pte & (PTE_P|PTE_U|PTE_W)) != 0)','  return -1;','if(a == last)','  break;'],a:1,
+    w:'It rejects a page when ANY of the three flags is set, which is the opposite of the intent. The test must be "!= (PTE_P|PTE_U|PTE_W)", meaning not all three are set.'}];
+  var bt=$('#bug-tabs'),bc=$('#bug-code'),bq=$('#bug-q'),bf=$('#bug-fb'),cur=0;
+  BUGS.forEach(function(b,i){var x=document.createElement('button');x.type='button';x.textContent='Challenge '+(i+1);x.addEventListener('click',function(){load(i)});bt.appendChild(x)});
+  function load(i){cur=i;$$('button',bt).forEach(function(b,j){b.setAttribute('aria-selected',j===i?'true':'false')});bq.textContent=BUGS[i].q;bc.innerHTML='';bf.className='verdict';bf.textContent='Click the line you think is wrong.';
+    BUGS[i].lines.forEach(function(l,li){var b=document.createElement('button');b.type='button';b.textContent=l;b.addEventListener('click',function(){
+      if(li===BUGS[cur].a){b.classList.add('good');bf.className='verdict ok';bf.textContent='Found it. '+BUGS[cur].w}else{b.classList.add('wrong');bf.className='verdict bad';bf.textContent='That line is fine. Read the others again.'}});bc.appendChild(b)})}
+  load(0);
+})();
+
+/* ---------- module 9: terminal replay and checklist ---------- */
+(function(){
+  var G=["vmdemo 7 3", "", "[1] 3 page(s) at 0x4000, writable control", "      stored and read back 7 ... 9", "", "[2] mprotect(0x4000, 3) = 0", "      protected read still works: 7", "pid 4 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x6000--kill proc", "      child write of 107 to 0x6000: STOPPED by page fault (child killed)", "      parent still alive, value unchanged: 9", "", "[3] fork inheritance: a new child inherits the read-only page", "pid 5 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x4000--kill proc", "      inherited child write of 207 to 0x4000: STOPPED by page fault (child killed)", "", "[4] invalid requests are rejected and change nothing", "      mprotect(0x4001, 1)  unaligned       = -1", "      mprotect(0x4000, 0)  zero length     = -1", "      munprotect(0x4000, 4) past heap end = -1", "pid 6 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x4000--kill proc", "      child (after rejected munprotect) write of 307 to 0x4000: STOPPED by page fault (child killed)", "", "[5] munprotect(0x4000, 3) = 0", "      parent wrote and read back 407", "      child write of 507 to 0x4000: SUCCEEDED", "", "vmdemo done; the shell is still running.", "$ vmtest", "vmtest: ok   allocate an aligned page", "vmtest: ok   writable control store/load", "vmtest: ok   mprotect one page returns 0", "vmtest: ok   protected page is still readable", "vmtest: child writing 0x5000 (a fault is expected if protected)", "pid 9 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0x5000--kill proc", "vmtest: ok   write to protected page faults in child", "vmtest: ok   parent value unchanged after child fault", "vmtest: ok   munprotect one page returns 0", "vmtest: ok   write after munprotect succeeds", "vmtest: child writing 0x5000 (a fault is expected if protected)", "vmtest: ok   child write to unprotected page succeeds", "pid 11 vmtest: trap 14 err 7 on cpu 0 eip 0xaec addr 0x6000--kill proc", "vmtest: ok   mprotect takes effect immediately (TLB refreshed)", "vmtest: ok   mprotect twice returns 0", "vmtest: child writing 0x7000 (a fault is expected if protected)", "pid 12 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0x7000--kill proc", "vmtest: ok   still protected after repeated mprotect", "vmtest: ok   munprotect twice returns 0", "vmtest: child writing 0x7000 (a fault is expected if protected)", "vmtest: ok   writable after repeated munprotect", "vmtest: ok   parent write after repeated munprotect", "vmtest: ok   mprotect three pages returns 0", "vmtest: child writing 0x9064 (a fault is expected if protected)", "pid 14 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0x9064--kill proc", "vmtest: child writing 0xA064 (a fault is expected if protected)", "pid 15 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xa064--kill proc", "vmtest: child writing 0xB064 (a fault is expected if protected)", "pid 16 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xb064--kill proc", "vmtest: ok   every page in the range is protected", "vmtest: child writing 0x8000 (a fault is expected if protected)", "vmtest: ok   page before the range still writable", "vmtest: child writing 0xC000 (a fault is expected if protected)", "vmtest: ok   page after the range still writable", "vmtest: ok   protected pages still readable", "vmtest: ok   munprotect three pages returns 0", "vmtest: ok   all three pages writable again", "vmtest: ok   protect page before fork", "vmtest: child writing 0xD000 (a fault is expected if protected)", "pid 19 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xd000--kill proc", "vmtest: ok   fork child inherits protection", "vmtest: ok   child can munprotect and write its copy", "vmtest: ok   parent copy not changed by child", "vmtest: child writing 0xD000 (a fault is expected if protected)", "pid 21 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xd000--kill proc", "vmtest: ok   parent page still protected after child munprotect", "vmtest: ok   parent munprotects", "vmtest: ok   parent writable after child mprotect", "vmtest: ok   unaligned address rejected", "vmtest: ok   unaligned munprotect rejected", "vmtest: ok   zero length rejected", "vmtest: ok   negative length rejected", "vmtest: ok   overflowing length rejected", "vmtest: ok   wrapping address rejected", "vmtest: ok   page past the heap end rejected", "vmtest: ok   kernel address rejected", "vmtest: ok   kernel munprotect rejected", "vmtest: ok   stack guard page rejected", "vmtest: ok   stack guard page munprotect rejected", "vmtest: ok   range running past the heap end rejected", "vmtest: child writing 0xE000 (a fault is expected if protected)", "vmtest: child writing 0xF000 (a fault is expected if protected)", "vmtest: ok   earlier pages left writable after rejected range", "vmtest: ok   range ending in the guard page rejected", "vmtest: child writing 0x2000 (a fault is expected if protected)", "vmtest: ok   page before the guard left writable after rejected range", "vmtest: ok   munprotect range past the heap end rejected", "vmtest: child writing 0xE000 (a fault is expected if protected)", "pid 26 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xe000--kill proc", "vmtest: child writing 0xF000 (a fault is expected if protected)", "pid 27 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xf000--kill proc", "vmtest: ok   earlier pages left protected after rejected munprotect", "vmtest: ok   valid range still works afterwards", "vmtest: ok   allocate two aligned pages", "vmtest: ok   protect first page for kernel-buffer tests", "vmtest: ok   create pipe", "vmtest: ok   fill pipe", "vmtest: ok   read() into protected page rejected", "vmtest: ok   protected page not modified by read()", "vmtest: ok   switch protection to second page", "vmtest: ok   read() spanning writable then protected page rejected", "vmtest: ok   neither page modified", "vmtest: ok   read() into writable page still works", "vmtest: ok   protect first page again", "vmtest: protected bytes via write(): xy", "vmtest: ok   write() from protected page allowed", "vmtest: ok   open vmtest for fstat", "vmtest: ok   fstat() into protected page rejected", "vmtest: ok   fstat() into writable buffer works", "vmtest: ok   pipe() into protected page rejected", "vmtest: ok   protected page unchanged", "vmtest: ok   unprotect both pages", "vmtest: 10 child write faults observed", "vmtest: ALL PASSED", "$ echo SHELL_STILL_ALIVE", "SHELL_STILL_ALIVE", "$ "];
+  function idx(s,from){for(var i=from||0;i<G.length;i++)if(G[i].indexOf(s)>=0)return i;return G.length-1}
+  var end=idx('vmdemo done');
+  var i1=idx('[1]'),i1e=idx('stored and read back'),i2=idx('protected read still works'),f=idx('STOPPED by page fault',i2),pa=idx('parent still alive'),i3=idx('inherited child write'),
+      i4=idx('[4]'),i4e=idx('after rejected munprotect'),i5=idx('[5]'),i5e=idx('child write of 507');
+  var S=[
+   {upto:i1e+1,hl:[i1,i1e],say:'Scene 1: a writable control. Three pages starting at 0x4000 hold the values 7, 8 and 9.'},
+   {upto:i2+1,hl:[i2-2,i2],say:'Scene 2: mprotect returned 0 and the page is still readable. Say: only the write bit changed.'},
+   {upto:pa+1,hl:[f-1,f],say:'A child writes and dies. Point at trap 14 err 7 and the word STOPPED. Then say: the parent is still alive and its value did not change.'},
+   {upto:i3+1,hl:[i3-1,i3],say:'Scene 3: a brand-new child inherits the read-only page, so it faults too. copyuvm copies the flags.'},
+   {upto:i4e+1,hl:[i4+1,i4+2,i4+3,i4e-1,i4e],say:'Scene 4: bad requests return -1, and the rejected munprotect changed nothing. The next child still faults.'},
+   {upto:end+1,hl:[i5,i5e-1,i5e],say:'Scene 5: after munprotect, the parent and a child can both write. The shell is still running.'}];
+  var n=0,term=$('#demo-term'),say=$('#demo-say');
+  function draw(){
+    var s=n>0?S[n-1]:null, up=s?s.upto:2, h='';
+    for(var i=0;i<up&&i<G.length;i++){
+      var l=G[i],c='';
+      if(l.indexOf('trap 14')>=0)c='fault';else if(l.indexOf('SUCCEEDED')>=0)c='ok';else if(l.indexOf('STOPPED')>=0)c='stop';else if(l.indexOf('vmdemo 7 3')===0)c='cmd';
+      var hl=s&&s.hl.indexOf(i)>=0?' hl':'';
+      h+='<span class="'+c+hl+'">'+(i===0?'$ ':'')+esc(l)+'</span>\n';
+    }
+    term.innerHTML=h; say.className='verdict'+(n===S.length?' ok':''); say.textContent=s?s.say:'Press Next scene to run the demo one step at a time.';
+    $('#demo-next').disabled=n>=S.length; if(n===S.length)complete('m9');
+  }
+  $('#demo-next').addEventListener('click',function(){if(n<S.length){n++;draw()}});
+  $('#demo-reset').addEventListener('click',function(){n=0;draw()});
+  draw();
+  $$('#pre-list input').forEach(function(c,i){c.checked=!!state.pre[i];c.addEventListener('change',function(){state.pre[i]=c.checked;save()})});
+})();
+
+/* ---------- module 10: exercises ---------- */
+(function(){
+  $$('button[data-done]').forEach(function(b){
+    var id=b.getAttribute('data-done');
+    function paintBtn(){b.textContent=state.ex[id]?'Done ✓':'I did this one';b.className='btn'+(state.ex[id]?' accent':'')}
+    paintBtn();
+    b.addEventListener('click',function(){state.ex[id]=!state.ex[id];save();paintBtn();if(['ex1','ex2','ex3','ex4'].every(function(k){return state.ex[k]}))complete('m10')});
+  });
+  if(['ex1','ex2','ex3','ex4'].every(function(k){return state.ex[k]}))complete('m10');
+})();
+
+/* ---------- module 11: flashcards ---------- */
+(function(){
+  var C=[
+   ['Why must the address be page-aligned, and the length in pages?','Permissions apply to whole pages, so an address in the middle of a page has no meaning.'],
+   ['Why two passes over the pages?','A failed call must change nothing. Pass one validates every page, so pass two cannot fail halfway.'],
+   ['What happens without the CR3 reload?','The TLB may keep a writable translation, so a write can still succeed. Only the immediate-effect test notices.'],
+   ['Why does only the child die, and what does trap 14 err 7 mean?','The fault happens in the child’s user mode, so only it is killed. Page fault: present + write + user.'],
+   ['Why did read() into a protected buffer panic, and why is write() still allowed?','CR0.WP makes kernel writes obey read-only pages, and a kernel-mode fault panics. We check output buffers first. write() only reads.'],
+   ['Why does fork keep the protection?','copyuvm copies the flag bits into the child’s own new page. The two pages are independent copies.'],
+   ['Can a process protect its own code at address 0?','Yes: code is a user page. The project does not change null-pointer behaviour.'],
+   ['What happens to protected pages after exec, or after sbrk shrinks the heap?','Exec builds a fresh address space. Shrinking frees pages normally. New heap pages are writable.'],
+   ['Is check-then-write safe with several CPUs and threads?','No: you would need locking or fault handling. Here there is one CPU and no threads, so nothing changes between check and write.'],
+   ['Why do the tests use a pipe instead of wait()?','xv6’s wait() returns no exit status, so a marker byte through a pipe shows whether the write succeeded.'],
+   ['What would error code 6 mean instead of 7?','A user write to a page that is not present.'],
+   ['Walk me from mprotect in C to the PTE change, naming every file.','user.h, usys.S stub (EAX = 22), syscall.h and the table in syscall.c, sysproc.c changeprotection, vm.c setuvmwrite: validate, clear PTE_W, lcr3. The result returns in EAX.']];
+  var order=C.map(function(_,i){return i}),pos=0,shown=false,fc=$('#fc'),dots=$('#fc-dots');
+  function draw(){
+    var i=order[pos],known=Object.keys(state.cards).filter(function(k){return state.cards[k]}).length;
+    fc.innerHTML='<div class="n">Card '+(pos+1)+' of '+C.length+'</div><p class="q">'+esc(C[i][0])+'</p>'+
+      (shown?'<div class="a">'+esc(C[i][1])+'</div><div class="bar"><button class="btn accent" type="button" id="fc-k">Knew it</button><button class="btn" type="button" id="fc-r">Review again</button></div>':
+      '<div class="bar"><button class="btn primary" type="button" id="fc-s">Show answer</button><button class="btn" type="button" id="fc-skip">Skip</button></div>');
+    dots.innerHTML=order.map(function(c,p){return '<i class="'+(state.cards[c]?'got':'')+(p===pos?' cur':'')+'"></i>'}).join('');
+    $('#fc-stat').textContent=known+' of '+C.length+' marked "knew it"';
+    var s=$('#fc-s');if(s)s.addEventListener('click',function(){shown=true;draw()});
+    var sk=$('#fc-skip');if(sk)sk.addEventListener('click',function(){next()});
+    var k=$('#fc-k');if(k)k.addEventListener('click',function(){state.cards[i]=true;save();if(Object.keys(state.cards).filter(function(x){return state.cards[x]}).length===C.length)complete('m11');next()});
+    var r=$('#fc-r');if(r)r.addEventListener('click',function(){state.cards[i]=false;save();next()});
+  }
+  function next(){shown=false;pos=(pos+1)%order.length;draw()}
+  $('#fc-shuffle').addEventListener('click',function(){for(var i=order.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=order[i];order[i]=order[j];order[j]=t}pos=0;shown=false;draw()});
+  draw();
+  if(Object.keys(state.cards).filter(function(x){return state.cards[x]}).length===C.length)complete('m11');
+})();
+
+paint();
+})();
+</script>
+
+</body>
+</html>

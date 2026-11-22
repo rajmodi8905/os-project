@@ -118,3 +118,9 @@ Key files: `vm.c` (`setuvmwrite`, `checkuvmwrite`, `copyout`), `sysproc.c`
   keyframes. Now: RHVoice rate 85, 0.28 s pauses, 25 fps H.264 with 4 s keyframes, 128 kbps
   audio, and an audio-only mp3 to separate player problems from audio problems. Also fixed the
   end-to-end trace scene, which sat in the wrong chapter in the full video.
+- **22 Nov 2026:** interactive course added in `docs/course/` (`index.html` is the finished
+  page; `course.template.html` holds the lessons and widgets; `build.py` fills in real code
+  and captured output from the repo and fails on a stale line range). Rebuild with
+  `python3 docs/course/build.py` (needs `pip install pygments`). Tested in a browser: every
+  widget, all quizzes, light/dark, phone width, no console errors. Also published as a
+  private artifact.
