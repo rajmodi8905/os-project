@@ -1,7 +1,7 @@
-<section class="module" id="module-1" style="background: var(--color-bg-warm)">
+<section class="module" id="module-2" style="background: var(--color-bg)">
   <div class="module-content">
     <header class="module-header animate-in">
-      <span class="module-number">01</span>
+      <span class="module-number">02</span>
       <h1 class="module-title">The Glass Case</h1>
       <p class="module-subtitle">What happens when a program locks part of its own memory, and why that is harder than flipping one switch</p>
     </header>
@@ -59,12 +59,12 @@
         <p>Flipping one {{bit}} sounds easy. These six rules are what the rest of the course is about.</p>
 
         <div class="step-cards">
-          <div class="step-card"><div class="step-num">1</div><div class="step-body"><strong>Reads must still work</strong><p>Clear only the write bit, nothing else. Module 3.</p></div></div>
-          <div class="step-card"><div class="step-num">2</div><div class="step-body"><strong>A write kills only that {{process}}</strong><p>The system keeps running. Modules 3 and 6.</p></div></div>
-          <div class="step-card"><div class="step-num">3</div><div class="step-body"><strong>A failed call changes nothing</strong><p>No half-protected ranges. Module 4.</p></div></div>
-          <div class="step-card"><div class="step-num">4</div><div class="step-body"><strong>The change is immediate</strong><p>The CPU keeps a cache that can still say "writable". Module 4.</p></div></div>
-          <div class="step-card"><div class="step-num">5</div><div class="step-body"><strong>Protection survives {{fork}}</strong><p>The child copy is protected too, and independent. Module 4.</p></div></div>
-          <div class="step-card"><div class="step-num">6</div><div class="step-body"><strong>The {{kernel}} must not be fooled</strong><p>Asking the kernel to write into your protected page must not crash it. Module 5.</p></div></div>
+          <div class="step-card"><div class="step-num">1</div><div class="step-body"><strong>Reads must still work</strong><p>Clear only the write bit, nothing else. Module 4.</p></div></div>
+          <div class="step-card"><div class="step-num">2</div><div class="step-body"><strong>A write kills only that {{process}}</strong><p>The system keeps running. Modules 4 and 7.</p></div></div>
+          <div class="step-card"><div class="step-num">3</div><div class="step-body"><strong>A failed call changes nothing</strong><p>No half-protected ranges. Module 5.</p></div></div>
+          <div class="step-card"><div class="step-num">4</div><div class="step-body"><strong>The change is immediate</strong><p>The CPU keeps a cache that can still say "writable". Module 5.</p></div></div>
+          <div class="step-card"><div class="step-num">5</div><div class="step-body"><strong>Protection survives {{fork}}</strong><p>The child copy is protected too, and independent. Module 5.</p></div></div>
+          <div class="step-card"><div class="step-num">6</div><div class="step-body"><strong>The {{kernel}} must not be fooled</strong><p>Asking the kernel to write into your protected page must not crash it. Module 6.</p></div></div>
         </div>
         <p>Out of scope: protecting address 0 ({{null pointer|null pointers}}), {{swapping}}, {{copy-on-write}}, and {{thread|threads}}.</p>
       </section>

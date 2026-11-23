@@ -125,3 +125,7 @@ Key files: `vm.c` (`setuvmwrite`, `checkuvmwrite`, `copyout`), `sysproc.c`
   `@@TB:file:first:last@@` translation blocks (code read from the real files, line ranges checked), writes
   `modules/` and `index.html`. Tested in a browser: all 7 quizzes, flow and chat animations, tooltips,
   drag-and-drop, every simulator, light and phone widths, no console errors. Published as a private artifact.
+- **23 Nov 2026:** added course Module 1, "The Case File" (`docs/course/src/00-case-file.html`): the
+  assignment, the issue in the original xv6 (before/after toggle), the four ideas of the solution, a
+  problem-to-fix matching exercise, the build story with the two bugs found by testing, the outcome in
+  numbers, and a quiz. The other modules are now 2 to 8 and all cross-references were renumbered.

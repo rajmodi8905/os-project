@@ -43,5 +43,8 @@
  "CI": "Continuous integration: a service (GitHub Actions here) that builds and tests the project automatically on every push.",
  "guest": "The xv6 system running inside QEMU. It is separate from your real computer.",
  "scratch copy": "A throwaway copy of the project used for experiments, so the real repository stays untouched.",
- "wrapper": "A thin function that adds nothing but a different way to call another function."
+ "wrapper": "A thin function that adds nothing but a different way to call another function.",
+ "xv6": "A small teaching operating system from MIT. It is simple enough to read in full, which makes it ideal for learning how a kernel works.",
+ "OSTEP": "Operating Systems: Three Easy Pieces, a free textbook. Its virtual-memory project is where this assignment comes from.",
+ "QEMU": "A program that pretends to be a whole computer. We run xv6 inside it so nothing touches the real machine."
 }

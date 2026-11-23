@@ -60,7 +60,7 @@
       else if (!u || !w) res('#r-uw', '#e-uw', false, 'page fault: process killed', 'trap 14 err 7 (present + write + user)');
       else res('#r-uw', '#e-uw', true, 'write succeeds', 'nothing: no fault');
       if (!p) res('#r-kw', '#e-kw', false, 'kernel fault: panic', 'trap 14 in kernel mode');
-      else if (!w && wp) res('#r-kw', '#e-kw', false, 'kernel fault: panic', 'trap 14 in kernel mode (the Module 5 crash)');
+      else if (!w && wp) res('#r-kw', '#e-kw', false, 'kernel fault: panic', 'trap 14 in kernel mode (the Module 6 crash)');
       else if (!w && !wp) res('#r-kw', '#e-kw', 'warn', 'write goes through', 'WP is off, so read-only is ignored in kernel mode');
       else res('#r-kw', '#e-kw', true, 'write succeeds', 'nothing: no fault');
     }

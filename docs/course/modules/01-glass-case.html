@@ -1,7 +1,7 @@
-<section class="module" id="module-1" style="background: var(--color-bg-warm)">
+<section class="module" id="module-2" style="background: var(--color-bg)">
   <div class="module-content">
     <header class="module-header animate-in">
-      <span class="module-number">01</span>
+      <span class="module-number">02</span>
       <h1 class="module-title">The Glass Case</h1>
       <p class="module-subtitle">What happens when a program locks part of its own memory, and why that is harder than flipping one switch</p>
     </header>
@@ -75,12 +75,12 @@
         <p>Flipping one <span class="term" data-definition="A single 0 or 1. A permission like writable is stored as one bit inside a larger number.">bit</span> sounds easy. These six rules are what the rest of the course is about.</p>
 
         <div class="step-cards">
-          <div class="step-card"><div class="step-num">1</div><div class="step-body"><strong>Reads must still work</strong><p>Clear only the write bit, nothing else. Module 3.</p></div></div>
-          <div class="step-card"><div class="step-num">2</div><div class="step-body"><strong>A write kills only that <span class="term" data-definition="A running program with its own private memory. Killing one process does not affect another.">process</span></strong><p>The system keeps running. Modules 3 and 6.</p></div></div>
-          <div class="step-card"><div class="step-num">3</div><div class="step-body"><strong>A failed call changes nothing</strong><p>No half-protected ranges. Module 4.</p></div></div>
-          <div class="step-card"><div class="step-num">4</div><div class="step-body"><strong>The change is immediate</strong><p>The CPU keeps a cache that can still say "writable". Module 4.</p></div></div>
-          <div class="step-card"><div class="step-num">5</div><div class="step-body"><strong>Protection survives <span class="term" data-definition="A system call that creates a child process: a copy of the parent with its own copy of every page.">fork</span></strong><p>The child copy is protected too, and independent. Module 4.</p></div></div>
-          <div class="step-card"><div class="step-num">6</div><div class="step-body"><strong>The <span class="term" data-definition="The privileged core of the operating system. It runs with more rights than ordinary programs and handles system calls.">kernel</span> must not be fooled</strong><p>Asking the kernel to write into your protected page must not crash it. Module 5.</p></div></div>
+          <div class="step-card"><div class="step-num">1</div><div class="step-body"><strong>Reads must still work</strong><p>Clear only the write bit, nothing else. Module 4.</p></div></div>
+          <div class="step-card"><div class="step-num">2</div><div class="step-body"><strong>A write kills only that <span class="term" data-definition="A running program with its own private memory. Killing one process does not affect another.">process</span></strong><p>The system keeps running. Modules 4 and 7.</p></div></div>
+          <div class="step-card"><div class="step-num">3</div><div class="step-body"><strong>A failed call changes nothing</strong><p>No half-protected ranges. Module 5.</p></div></div>
+          <div class="step-card"><div class="step-num">4</div><div class="step-body"><strong>The change is immediate</strong><p>The CPU keeps a cache that can still say "writable". Module 5.</p></div></div>
+          <div class="step-card"><div class="step-num">5</div><div class="step-body"><strong>Protection survives <span class="term" data-definition="A system call that creates a child process: a copy of the parent with its own copy of every page.">fork</span></strong><p>The child copy is protected too, and independent. Module 5.</p></div></div>
+          <div class="step-card"><div class="step-num">6</div><div class="step-body"><strong>The <span class="term" data-definition="The privileged core of the operating system. It runs with more rights than ordinary programs and handles system calls.">kernel</span> must not be fooled</strong><p>Asking the kernel to write into your protected page must not crash it. Module 6.</p></div></div>
         </div>
         <p>Out of scope: protecting address 0 (<span class="term" data-definition="A pointer to address 0. Most systems protect page 0 so that using it by mistake crashes loudly. Out of scope here.">null pointers</span>), <span class="term" data-definition="Moving memory pages out to disk when RAM is full, and back later. Not part of this project.">swapping</span>, <span class="term" data-definition="A trick where parent and child share pages after fork and only copy a page when one of them writes it. xv6 here copies up front instead.">copy-on-write</span>, and <span class="term" data-definition="An independent flow of execution inside one process that shares its memory. xv6 here has none, which makes the check-then-write safe.">threads</span>.</p>
       </section>

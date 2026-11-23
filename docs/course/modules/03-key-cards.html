@@ -1,7 +1,7 @@
-<section class="module" id="module-3" style="background: var(--color-bg-warm)">
+<section class="module" id="module-4" style="background: var(--color-bg)">
   <div class="module-content">
     <header class="module-header animate-in">
-      <span class="module-number">03</span>
+      <span class="module-number">04</span>
       <h1 class="module-title">Key Cards</h1>
       <p class="module-subtitle">How an address becomes a page, and the three permission bits the hardware checks every time you touch memory</p>
     </header>
@@ -154,7 +154,7 @@
             <tr><td>User writes the page</td><td id="r-uw"></td><td id="e-uw"></td></tr>
             <tr><td>Kernel writes the page</td><td id="r-kw"></td><td id="e-kw"></td></tr></table></div>
         </div>
-        <p>Turn off <b>CR0.WP</b> and look at the third row. The kernel would silently write through the glass. xv6 turns it on, which causes a surprise in Module 5.</p>
+        <p>Turn off <b>CR0.WP</b> and look at the third row. The kernel would silently write through the glass. xv6 turns it on, which causes a surprise in Module 6.</p>
       </section>
 
       <section class="screen animate-in">
@@ -180,7 +180,7 @@
 
       <section class="screen animate-in">
         <h2 class="screen-heading">When the key card is refused</h2>
-        <p>If user code writes a read-only page, the <span class="term" data-definition="The processor that runs instructions. It checks the permission bits on every single memory access.">CPU</span> raises <span class="term" data-definition="A transfer of control into the kernel caused by an event: a system call, a fault, or an interrupt. Trap 14 is a page fault.">trap</span> number 14, a <span class="term" data-definition="The CPU&#x27;s complaint when an access is not allowed, for example writing a read-only page. xv6 kills the process that caused it.">page fault</span>. xv6's existing handler runs. This is the code that prints the message you saw in Module 1.</p>
+        <p>If user code writes a read-only page, the <span class="term" data-definition="The processor that runs instructions. It checks the permission bits on every single memory access.">CPU</span> raises <span class="term" data-definition="A transfer of control into the kernel caused by an event: a system call, a fault, or an interrupt. Trap 14 is a page fault.">trap</span> number 14, a <span class="term" data-definition="The CPU&#x27;s complaint when an access is not allowed, for example writing a read-only page. xv6 kills the process that caused it.">page fault</span>. xv6's existing handler runs. This is the code that prints the message you saw in Module 2.</p>
 
 <div class="translation-block animate-in">
   <div class="translation-code">

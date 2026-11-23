@@ -1,0 +1,213 @@
+<section class="module" id="module-1" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">The Case File</h1>
+      <p class="module-subtitle">The assignment, the problem in the original xv6, how we solved it, what surprised us on the way, and how we know it works</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A patient walks in</h2>
+        <p>A doctor's case file always has four parts: the symptom, the diagnosis, the treatment, and the outcome. This whole project fits that shape, so we will open it first and fill in the details in the modules that follow.</p>
+
+        <div class="icon-rows">
+          <div class="icon-row"><div class="icon-circle" style="background: var(--color-actor-1)">🩺</div><div><strong>Symptom</strong><p>In the original <span class="term" data-definition="A small teaching operating system from MIT. It is simple enough to read in full, which makes it ideal for learning how a kernel works.">xv6</span>, a program can write to any page it owns. There is no way to say "this part must never change".</p></div></div>
+          <div class="icon-row"><div class="icon-circle" style="background: var(--color-actor-2)">🔍</div><div><strong>Diagnosis</strong><p>The hardware already has a permission bit for this. The kernel simply never lets a program use it.</p></div></div>
+          <div class="icon-row"><div class="icon-circle" style="background: var(--color-actor-3)">💊</div><div><strong>Treatment</strong><p>Two new system calls, <code>mprotect</code> and <code>munprotect</code>, plus the guard rails that make them safe.</p></div></div>
+          <div class="icon-row"><div class="icon-circle" style="background: var(--color-actor-5)">✅</div><div><strong>Outcome</strong><p>65 checks pass, the original xv6 tests still pass, and a live demo shows a blocked write.</p></div></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The assignment</h2>
+        <p>This is an individual operating-systems course project. It comes from the <span class="term" data-definition="Operating Systems: Three Easy Pieces, a free textbook. Its virtual-memory project is where this assignment comes from.">OSTEP</span> virtual-memory project, the "read-only code" part, done in the x86 version of xv6.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🎯</div>
+            <h4 class="pattern-title">What we had to build</h4>
+            <p class="pattern-desc">Let a program remove write permission from its own pages, keep reading them, and restore write permission later.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🧱</div>
+            <h4 class="pattern-title">What we started from</h4>
+            <p class="pattern-desc">The unchanged x86 xv6 source, pinned at one exact commit, building and booting in <span class="term" data-definition="A program that pretends to be a whole computer. We run xv6 inside it so nothing touches the real machine.">QEMU</span> with its own tests passing.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🚫</div>
+            <h4 class="pattern-title">What we left out</h4>
+            <p class="pattern-desc">Protecting address 0 (null pointers), swapping, copy-on-write and threads. A smaller scope, done properly.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">🎓</div>
+          <div class="callout-content">
+            <strong class="callout-title">The rules of the viva</strong>
+            <p>Demo and viva are due by the end-semester exam plus three days. AI help is allowed, but you must own every line: explain any block correctly and change it without help. This course exists to get you there.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The issue, before and after</h2>
+        <p>Press the tabs to compare. The "before" behaviour comes straight from the original kernel code; the "after" is the real output you will see in Module 2.</p>
+
+        <div class="layer-demo">
+          <div class="layer-tabs">
+            <button class="layer-tab active" onclick="showLayer('layer-before', this)">Before: original xv6</button>
+            <button class="layer-tab" onclick="showLayer('layer-after', this)">After: our change</button>
+          </div>
+          <div class="layer-viewport">
+            <div class="layer" id="layer-before" style="display:block">
+              <div class="step-cards">
+                <div class="step-card"><div class="step-num">1</div><div class="step-body"><strong>Every page you own is always writable</strong><p>A stray write from a bug in your own program silently changes data. Nothing warns you.</p></div></div>
+                <div class="step-card"><div class="step-num">2</div><div class="step-body"><strong>No way to lock anything</strong><p>Ask the kernel for system call 22 and the dispatcher finds an empty slot: it prints "unknown sys call 22" and returns -1.</p></div></div>
+                <div class="step-card"><div class="step-num">3</div><div class="step-body"><strong>The hardware is ready, the software is not</strong><p>Every page table entry already has a write bit. xv6 sets it once and never changes it.</p></div></div>
+              </div>
+            </div>
+            <div class="layer" id="layer-after" style="display:none">
+              <div class="step-cards">
+                <div class="step-card"><div class="step-num">1</div><div class="step-body"><strong>A program locks pages on purpose</strong><p><code>mprotect(p, 3)</code> returns 0. Reading still works.</p></div></div>
+                <div class="step-card"><div class="step-num">2</div><div class="step-body"><strong>A stray write is stopped by the hardware</strong><p>The CPU raises <code>trap 14 err 7</code> and xv6 prints the address that was touched.</p></div></div>
+                <div class="step-card"><div class="step-num">3</div><div class="step-body"><strong>Only the offender dies</strong><p>The child that wrote is killed. The parent keeps running and its data is unchanged.</p></div></div>
+              </div>
+            </div>
+          </div>
+          <p class="layer-description">The change is small. The hard part is making it safe.</p>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">How we solved it: four ideas</h2>
+        <p>Almost all of the project comes down to these four ideas. Each one gets its own module.</p>
+
+        <div class="flow-steps">
+          <div class="flow-step"><div class="flow-step-num">1</div><p>Flip <b>one bit</b>: the write bit of each page</p></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step"><div class="flow-step-num">2</div><p>Check <b>everything first</b>, then change</p></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step"><div class="flow-step-num">3</div><p><b>Flush</b> the CPU's cache</p></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step"><div class="flow-step-num">4</div><p>Guard the <b>kernel's own writes</b></p></div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🧩</div>
+          <div class="callout-content">
+            <strong class="callout-title">One thing needed no code at all</strong>
+            <p>Fork already copies each page together with its flags, so a protected page stays protected in the child. We only had to prove it with a test.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Match each problem to its fix</h2>
+        <p>Six requirements, six answers. Drag each fix onto the problem it solves. You will see every one in detail later, so guess from what you already know.</p>
+
+        <div class="dnd-container" id="dnd-brief">
+          <div class="dnd-chips">
+            <div class="dnd-chip" draggable="true" data-answer="mask">Clear one bit with a mask</div>
+            <div class="dnd-chip" draggable="true" data-answer="trap">xv6's existing trap handler</div>
+            <div class="dnd-chip" draggable="true" data-answer="twopass">Two passes</div>
+            <div class="dnd-chip" draggable="true" data-answer="cr3">Reload CR3</div>
+            <div class="dnd-chip" draggable="true" data-answer="copy">Nothing new: copyuvm copies the flags</div>
+            <div class="dnd-chip" draggable="true" data-answer="argptrw">A writable check on output buffers</div>
+          </div>
+          <div class="dnd-zones">
+            <div class="dnd-zone" data-correct="mask"><p class="dnd-zone-label">Reads must still work after protecting</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="trap"><p class="dnd-zone-label">A write must kill only the program that did it</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="twopass"><p class="dnd-zone-label">A failed call must change nothing</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="cr3"><p class="dnd-zone-label">The change must take effect immediately</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="copy"><p class="dnd-zone-label">Protection must survive fork</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="argptrw"><p class="dnd-zone-label">The kernel must not crash when asked to write into a protected page</p><div class="dnd-zone-target">Drop here</div></div>
+          </div>
+          <button class="quiz-check-btn" onclick="checkDnD('dnd-brief')">Check Matches</button>
+          <button class="quiz-reset-btn" onclick="resetDnD('dnd-brief')">Reset</button>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">How it was built, step by step</h2>
+        <p>The work followed a plan with checkpoints. The real history is in the repository; this is the story of it.</p>
+
+        <div class="step-cards">
+          <div class="step-card"><div class="step-num">1</div><div class="step-body"><strong>Baseline first</strong><p>Pin the original xv6, add one-command build, run and check scripts, and get a green CI run. Nothing new yet.</p></div></div>
+          <div class="step-card"><div class="step-num">2</div><div class="step-body"><strong>The two system calls and the helper</strong><p>Wire up numbers 22 and 23 and write <code>setuvmwrite</code> with its validate-then-change structure. First tiny test: protect, read, refused write, restore.</p></div></div>
+          <div class="step-card"><div class="step-num">3</div><div class="step-body"><strong>A crash we did not plan for</strong><p>A test that read from a pipe into a protected page <em>panicked the whole kernel</em>. We reproduced it first, then added the writable check. Module 6.</p></div></div>
+          <div class="step-card"><div class="step-num">4</div><div class="step-body"><strong>The full test suite, and a gap in it</strong><p>We deleted the CR3 reload on purpose. The suite still passed. So we added the test that catches it. Module 7.</p></div></div>
+          <div class="step-card"><div class="step-num">5</div><div class="step-body"><strong>A demo and the explanations</strong><p>A friendly demo program, then the documents that map every changed file. This course is the last piece.</p></div></div>
+          <div class="step-card"><div class="step-num">6</div><div class="step-body"><strong>Check it somewhere else</strong><p>The same check passed in GitHub Actions and on a fresh clone on a Linux laptop. A second machine finds what the first one hides.</p></div></div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Two bugs were found by testing, not by thinking</strong>
+            <p>The kernel crash and the missing-flush gap were both discovered because we tried to break our own work. Good engineering is mostly arranging for your mistakes to show up early.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The outcome in numbers</h2>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-5)"><div class="pattern-icon" style="background: var(--color-actor-5)">65</div><h4 class="pattern-title">checks in our suite</h4><p class="pattern-desc">Seven groups, from a basic protect-and-write to atomic rejection of bad ranges.</p></div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)"><div class="pattern-icon" style="background: var(--color-actor-2)">10</div><h4 class="pattern-title">expected faults, all matched</h4><p class="pattern-desc">The test counts 10 blocked writes and the kernel printed exactly 10 fault lines.</p></div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-4)"><div class="pattern-icon" style="background: var(--color-actor-4)">~120</div><h4 class="pattern-title">lines of kernel code added</h4><p class="pattern-desc">Spread over nine existing files, plus a test program and a demo program.</p></div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-1)"><div class="pattern-icon" style="background: var(--color-actor-1)">3</div><h4 class="pattern-title">places it passed</h4><p class="pattern-desc">A Linux container, GitHub Actions, and a fresh clone on the Pop!_OS laptop.</p></div>
+        </div>
+        <p>The original xv6 test suite still passes too: we added a feature without breaking anything that worked before.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <div class="quiz-container" id="quiz-brief">
+
+          <div class="quiz-question-block" data-correct="b"
+               data-explanation-right="That answer names the real gap (no way to lock memory), the mechanism (the write bit that already exists) and the safety requirement. It shows you understand the problem, not just the names of the calls."
+               data-explanation-wrong="An examiner wants the problem and the idea, not only the function names. The gap is that a program had no way to make its memory read-only, even though the hardware has a bit for it.">
+            <h3 class="quiz-question">An examiner says: "In one breath, what problem does your project solve?" Which answer is strongest?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>"I added mprotect and munprotect to xv6."</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>"A program could not make its own memory read-only, though the hardware has a write bit for it. I added two calls that clear and set that bit safely: validated first, flushed after, and guarded against the kernel faulting itself."</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>"I made xv6 faster by caching page tables."</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="c"
+               data-explanation-right="The crash came from the kernel writing into a protected page, which is exactly the case a user-level test of 'does my write fault' never exercises. Trying system calls against protected buffers exposed it."
+               data-explanation-wrong="Think about who did the writing. Ordinary user writes were already handled correctly. The crash appeared only when a system call asked the kernel to write into a protected page.">
+            <h3 class="quiz-question">Why did the kernel-crash bug survive until we ran a test that read into a protected page, and not appear in the very first tests?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The first tests ran too fast to notice it.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It only happens on a second CPU.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The first tests only made <em>user</em> code write. The crash needs the <em>kernel</em> to write into the protected page, which only certain system calls do.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="a"
+               data-explanation-right="A lesson that generalises: deliberately break the thing and see whether the test notices. If it does not, you have found a hole in the tests, not proof that the code is fine."
+               data-explanation-wrong="Do not read a passing suite as proof. The suite still passed after the flush was deleted, so it was missing a case. Fix the test, then keep the deletion experiment as evidence.">
+            <h3 class="quiz-question">You delete a line you believe is essential, and every test still passes. What is the right conclusion?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The tests have a gap. Add a test that fails without that line, then restore the line.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The line was unnecessary; leave it deleted.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The code is correct, because all tests pass.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-brief')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-brief')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
