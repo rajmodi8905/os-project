@@ -1,0 +1,2 @@
+unexpected trap 14 from cpu 0 eip 80103743 (cr2=0x5000)
+lapicid 0: panic: trap

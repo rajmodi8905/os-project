@@ -1,0 +1,290 @@
+<section class="module" id="module-2" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">The Switchboard</h1>
+      <p class="module-subtitle">Meet the six characters a single mprotect call passes through, and the files each one lives in</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">An old office switchboard</h2>
+        <p>Picture a company with one front-desk operator and a board of numbered extensions. A caller says "extension 22, please". The operator plugs the cable into slot 22 and a specialist picks up.</p>
+        <p>A <span class="term" data-definition="A numbered request from a program to the kernel, like open, read or mprotect. The only door into the kernel.">system call</span> works the same way. Your program asks for a numbered service, and the kernel connects it to the right <span class="term" data-definition="The function that deals with one request. Here, sys_mprotect is the handler for system call 22.">handler</span>.</p>
+
+        <div class="icon-rows">
+          <div class="icon-row"><div class="icon-circle" style="background: var(--color-actor-1)">📞</div><div><strong>Your program</strong><p>Calls <code>mprotect(p, 2)</code> like any normal function.</p></div></div>
+          <div class="icon-row"><div class="icon-circle" style="background: var(--color-actor-2)">🔔</div><div><strong>The stub, <code>usys.S</code></strong><p>Writes the extension number (22) on a note and rings the kernel's bell.</p></div></div>
+          <div class="icon-row"><div class="icon-circle" style="background: var(--color-actor-3)">🔀</div><div><strong>The switchboard, <code>syscall.c</code></strong><p>Reads the number and plugs into the matching slot of the <span class="term" data-definition="An array indexed by system call number whose slots hold the handler functions. Slot 22 holds sys_mprotect.">dispatch table</span>.</p></div></div>
+          <div class="icon-row"><div class="icon-circle" style="background: var(--color-actor-4)">🗒️</div><div><strong>The receptionist, <code>sysproc.c</code></strong><p>Collects the details (address, count) and passes them on. Adds no rules.</p></div></div>
+          <div class="icon-row"><div class="icon-circle" style="background: var(--color-actor-5)">🛠️</div><div><strong>The specialist, <code>vm.c</code></strong><p>The function <code>setuvmwrite</code> does the real work on the <span class="term" data-definition="A data structure in memory that maps virtual pages to physical pages and holds their permission bits.">page table</span>.</p></div></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Where everyone sits</h2>
+        <p>Click any box to see what that part does. Notice the three zones: the program, the kernel's software, and the hardware that finally enforces the rule.</p>
+
+        <div class="arch-diagram">
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">User space (your program)</h4>
+            <div class="arch-component" data-desc="The program asks for protection with an ordinary-looking function call. user.h gives it the prototype so it compiles."><div class="arch-icon">📞</div><span>Program</span></div>
+            <div class="arch-component" data-desc="usys.S: a one-line assembly stub per call. It loads the call number into EAX and executes int T_SYSCALL to enter the kernel."><div class="arch-icon">🔔</div><span>Stub</span></div>
+          </div>
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">Kernel software</h4>
+            <div class="arch-component" data-desc="syscall.c: reads the number from EAX, finds the handler in the table, calls it, and puts the result back in EAX."><div class="arch-icon">🔀</div><span>Dispatcher</span></div>
+            <div class="arch-component" data-desc="sysproc.c: sys_mprotect and sys_munprotect fetch the two arguments and call one shared front end, changeprotection."><div class="arch-icon">🗒️</div><span>Handlers</span></div>
+            <div class="arch-component" data-desc="vm.c: setuvmwrite validates every page, changes only the write bit, then reloads CR3 so the CPU forgets stale permissions."><div class="arch-icon">🛠️</div><span>setuvmwrite</span></div>
+          </div>
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">Hardware</h4>
+            <div class="arch-component" data-desc="The page table lives in memory. Each entry (PTE) holds the physical page and permission bits, including the write bit we toggle."><div class="arch-icon">📋</div><span>Page table</span></div>
+            <div class="arch-component" data-desc="The CPU checks permissions on every memory access, using a small cache (the TLB). A forbidden write raises trap 14."><div class="arch-icon">🧠</div><span>CPU and TLB</span></div>
+          </div>
+          <div class="arch-description" id="arch-desc">Click any component to learn what it does</div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">One call, end to end</h2>
+        <p>Press Next Step and follow a single <code>mprotect(p, 2)</code> through the five characters.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-c1-1","label":"Your program calls mprotect(p, 2) as if it were an ordinary function."},
+          {"highlight":"flow-c1-2","label":"The stub puts 22 in the EAX register and runs int T_SYSCALL: a knock on the kernel door.","packet":true,"from":"c1-1","to":"c1-2"},
+          {"highlight":"flow-c1-3","label":"The switchboard reads 22 from EAX and looks up slot 22 in the table: sys_mprotect.","packet":true,"from":"c1-2","to":"c1-3"},
+          {"highlight":"flow-c1-4","label":"sys_mprotect fetches the two arguments from the user stack and calls changeprotection(0).","packet":true,"from":"c1-3","to":"c1-4"},
+          {"highlight":"flow-c1-5","label":"setuvmwrite gets the page directory, process size, address, count and writable = 0.","packet":true,"from":"c1-4","to":"c1-5"},
+          {"highlight":"flow-c1-5","label":"It validates every page, clears the write bit, and reloads CR3. The work is done."},
+          {"highlight":"flow-c1-4","label":"It returns 0 (or -1 for a bad request) back up to the receptionist.","packet":true,"from":"c1-5","to":"c1-4"},
+          {"highlight":"flow-c1-1","label":"The result travels back through EAX to your program. The next write is already checked against the new permission.","packet":true,"from":"c1-4","to":"c1-1"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-c1-1"><div class="flow-actor-icon">P</div><span>Program</span></div>
+            <div class="flow-actor" id="flow-c1-2"><div class="flow-actor-icon">S</div><span>Stub</span></div>
+            <div class="flow-actor" id="flow-c1-3"><div class="flow-actor-icon">D</div><span>Switchboard</span></div>
+            <div class="flow-actor" id="flow-c1-4"><div class="flow-actor-icon">R</div><span>Receptionist</span></div>
+            <div class="flow-actor" id="flow-c1-5"><div class="flow-actor-icon">V</div><span>Specialist</span></div>
+          </div>
+          <div class="flow-packet" id="flow-packet-c1"></div>
+          <div class="flow-step-label" id="flow-label-c1">Click "Next Step" to begin</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Or listen to them talk</h2>
+        <p>The same journey as a group chat. Each character only knows its own job.</p>
+
+        <div class="chat-window" id="chat-module2">
+          <div class="chat-messages">
+            <div class="chat-message" data-msg="0" data-sender="program" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">P</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-1)">Program</span><p>Hello kernel! Please make 2 pages starting at <code>p</code> read-only.</p></div>
+            </div>
+            <div class="chat-message" data-msg="1" data-sender="stub" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">S</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-2)">Stub</span><p>I only do one thing: write 22 in EAX and ring the bell. <code>int T_SYSCALL</code>!</p></div>
+            </div>
+            <div class="chat-message" data-msg="2" data-sender="switch" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">D</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-3)">Switchboard</span><p>22? That is <code>sys_mprotect</code>. Connecting you now. If it were 99 I would print "unknown sys call".</p></div>
+            </div>
+            <div class="chat-message" data-msg="3" data-sender="recep" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">R</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-4)">Receptionist</span><p>Got it: address and count from the user stack. Same form for munprotect, only the last box changes. Over to the specialist.</p></div>
+            </div>
+            <div class="chat-message" data-msg="4" data-sender="spec" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">V</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-5)">Specialist</span><p>First I check <em>every</em> page: aligned, mapped, user-owned. Nothing is touched until all pass.</p></div>
+            </div>
+            <div class="chat-message" data-msg="5" data-sender="spec" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">V</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-5)">Specialist</span><p>All good. Clearing the write bit on both pages, then reloading CR3 so the CPU forgets the old cache.</p></div>
+            </div>
+            <div class="chat-message" data-msg="6" data-sender="recep" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">R</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-4)">Receptionist</span><p>Result is 0. Passing it back up.</p></div>
+            </div>
+            <div class="chat-message" data-msg="7" data-sender="program" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">P</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-1)">Program</span><p>Zero means success. Now I will <em>try</em> to write to <code>p</code>... and see what the CPU says.</p></div>
+            </div>
+          </div>
+          <div class="chat-typing" id="chat-typing" style="display:none">
+            <div class="chat-avatar" id="chat-module2-typing-avatar">?</div>
+            <div class="chat-typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>
+          </div>
+          <div class="chat-controls">
+            <button class="btn chat-next-btn">Next Message</button>
+            <button class="btn chat-all-btn">Play All</button>
+            <button class="btn chat-reset-btn">Replay</button>
+            <span class="chat-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The wiring, in real code</h2>
+        <p>These four small pieces are the entire path. Everything else in xv6 is untouched.</p>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · usys.S · lines 4-9</span>
+    <pre><code><span class="code-line"><span class="code-comment">#define SYSCALL(name) \</span></span>
+<span class="code-line">  .globl name; \</span>
+<span class="code-line">  name<span class="code-operator">:</span> \</span>
+<span class="code-line">    movl <span class="code-operator">$</span>SYS_ <span class="code-comment">## name, %eax; \</span></span>
+<span class="code-line">    int <span class="code-operator">$</span>T_SYSCALL; \</span>
+<span class="code-line">    ret</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">A <span class="term" data-definition="A named template the compiler expands before compiling. #define lines in C, and SYSCALL in usys.S, are macros.">template</span> called SYSCALL that builds one tiny function per system call.</p>
+        <p class="tl">Make that function visible to the rest of the program.</p>
+        <p class="tl">Put this call's number into the <span class="term" data-definition="A general-purpose CPU register. By convention the call number goes in on the way in, and the result comes back in it.">EAX register</span>. We added numbers 22 and 23.</p>
+        <p class="tl">Knock on the kernel door with a software <span class="term" data-definition="A signal that makes the CPU stop what it is doing and jump into the kernel. A system call uses a software interrupt (int).">interrupt</span>.</p>
+        <p class="tl">When the kernel finishes, return to the program with whatever it left in EAX.</p>
+    </div>
+  </div>
+</div>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · syscall.c · lines 141-142</span>
+    <pre><code><span class="code-line">[SYS_mprotect]   sys_mprotect,</span>
+<span class="code-line">[SYS_munprotect] sys_munprotect,</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">Slot 22 of the table holds the handler for mprotect.</p>
+        <p class="tl">Slot 23 holds the handler for munprotect. Our only table edits.</p>
+    </div>
+  </div>
+</div>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · syscall.c · lines 151-153</span>
+    <pre><code><span class="code-line">  num <span class="code-operator">=</span> curproc<span class="code-operator">-</span><span class="code-operator">&gt;</span>tf<span class="code-operator">-</span><span class="code-operator">&gt;</span>eax;</span>
+<span class="code-line">  <span class="code-keyword">if</span>(num <span class="code-operator">&gt;</span> <span class="code-number">0</span> <span class="code-operator">&amp;</span><span class="code-operator">&amp;</span> num <span class="code-operator">&lt;</span> NELEM(syscalls) <span class="code-operator">&amp;</span><span class="code-operator">&amp;</span> syscalls[num]) {</span>
+<span class="code-line">    curproc<span class="code-operator">-</span><span class="code-operator">&gt;</span>tf<span class="code-operator">-</span><span class="code-operator">&gt;</span>eax <span class="code-operator">=</span> syscalls[num]();</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">Read the call number the stub left in EAX.</p>
+        <p class="tl">Check it is a real slot with a real handler, otherwise print "unknown sys call".</p>
+        <p class="tl">Run the handler and store its answer back in EAX, which is what the program sees as the return value.</p>
+    </div>
+  </div>
+</div>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · sysproc.c · lines 96-105</span>
+    <pre><code><span class="code-line"><span class="code-keyword">static</span> <span class="code-keyword">int</span></span>
+<span class="code-line">changeprotection(<span class="code-keyword">int</span> writable)</span>
+<span class="code-line">{</span>
+<span class="code-line">  <span class="code-keyword">int</span> addr, len;</span>
+<span class="code-line">  <span class="code-keyword">struct</span> proc <span class="code-operator">*</span>curproc <span class="code-operator">=</span> myproc();</span>
+<span class="code-line"> </span>
+<span class="code-line">  <span class="code-keyword">if</span>(argint(<span class="code-number">0</span>, <span class="code-operator">&amp;</span>addr) <span class="code-operator">&lt;</span> <span class="code-number">0</span> <span class="code-operator">|</span><span class="code-operator">|</span> argint(<span class="code-number">1</span>, <span class="code-operator">&amp;</span>len) <span class="code-operator">&lt;</span> <span class="code-number">0</span>)</span>
+<span class="code-line">    <span class="code-keyword">return</span> <span class="code-number">-1</span>;</span>
+<span class="code-line">  <span class="code-keyword">return</span> setuvmwrite(curproc<span class="code-operator">-</span><span class="code-operator">&gt;</span>pgdir, curproc<span class="code-operator">-</span><span class="code-operator">&gt;</span>sz, (uint)addr, len, writable);</span>
+<span class="code-line">}</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">A private helper shared by both calls. <code>writable</code> is 0 for mprotect and 1 for munprotect.</p>
+        <p class="tl">Find the process that made the call.</p>
+        <p class="tl">Fetch argument 0 (the address) and argument 1 (the page count) from the user's <span class="term" data-definition="A program&#x27;s scratch space for function arguments and local variables. System call arguments are read from it.">stack</span>. If that fails, return -1.</p>
+        <p class="tl">Hand everything to setuvmwrite: page directory, process size, address, count, wanted state.</p>
+        <p class="tl">That single return is the whole body. The receptionist adds no rules of its own.</p>
+    </div>
+  </div>
+</div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🧩</div>
+          <div class="callout-content">
+            <strong class="callout-title">One helper, two thin wrappers</strong>
+            <p>mprotect and munprotect call the same function with a different last argument. That keeps their rules identical, so they can never drift apart.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Where the code lives</h2>
+        <div class="file-tree">
+          <div class="ft-folder open"><span class="ft-name">kernel files (xv6)</span><span class="ft-desc">Original xv6, with our small additions</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">vm.c</span><span class="ft-desc">setuvmwrite, checkuvmwrite, one line in copyout (lines 313 to 378, 444)</span></div>
+              <div class="ft-file"><span class="ft-name">sysproc.c</span><span class="ft-desc">the two handlers and changeprotection (lines 93 to 117)</span></div>
+              <div class="ft-file"><span class="ft-name">syscall.c / syscall.h</span><span class="ft-desc">table slots and numbers 22, 23; argptrw</span></div>
+              <div class="ft-file"><span class="ft-name">sysfile.c</span><span class="ft-desc">argptr became argptrw in read, fstat, pipe</span></div>
+              <div class="ft-file"><span class="ft-name">usys.S, user.h, defs.h</span><span class="ft-desc">stubs and prototypes</span></div>
+            </div>
+          </div>
+          <div class="ft-folder"><span class="ft-name">vmtest.c, vmdemo.c</span><span class="ft-desc">the test suite and the demo, run inside the guest</span></div>
+          <div class="ft-folder"><span class="ft-name">scripts/ and .github/</span><span class="ft-desc">smoke.py runner and the CI workflow</span></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <div class="quiz-container" id="quiz-module2">
+
+          <div class="quiz-question-block" data-correct="b"
+               data-explanation-right="The dispatcher prints that message when the table has no handler for the number. A missing table slot is the classic cause; a missing stub would not even link."
+               data-explanation-wrong="Trace the path. A missing stub or prototype fails at build time. The message comes from syscall(), which found nothing in the table for number 24.">
+            <h3 class="quiz-question">You add a new system call <code>getprot</code> with number 24. It builds fine, but running it makes the kernel print "unknown sys call 24". What did you most likely forget?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The stub line in <code>usys.S</code>.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The slot <code>[SYS_getprot] sys_getprot,</code> in the table in <code>syscall.c</code>.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The prototype in <code>user.h</code>.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="a"
+               data-explanation-right="Both calls go through the same changeprotection and setuvmwrite, so one mistake there shows up in both. That is the benefit, and the risk, of sharing the helper."
+               data-explanation-wrong="Look at who calls setuvmwrite. Both sys_mprotect and sys_munprotect go through changeprotection, so an error in it affects both calls.">
+            <h3 class="quiz-question">You swap two arguments inside <code>changeprotection</code>. Both mprotect and munprotect start misbehaving in the same way. Why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>They share one helper, so one mistake there affects both.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The stub in <code>usys.S</code> is shared and got corrupted.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The page table is global and both calls overwrite it.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="c"
+               data-explanation-right="All the rules (alignment, range, validation) live in setuvmwrite in vm.c. The earlier characters only pass the request along."
+               data-explanation-wrong="The stub, dispatcher and receptionist only forward the request. Validation of the range happens in the specialist, setuvmwrite, in vm.c.">
+            <h3 class="quiz-question">A tester reports that <code>mprotect(p, 5)</code> protects the first two pages and then returns -1 because page 3 is invalid. Which file do you open first?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>usys.S</code>, where the call enters the kernel.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>syscall.c</code>, where the number is looked up.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>vm.c</code>, in <code>setuvmwrite</code>, where pages are validated and changed.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module2')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module2')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

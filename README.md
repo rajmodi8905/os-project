@@ -17,10 +17,11 @@ remains (see plan.md).
 - [video/README.md](video/README.md): two narrated viva videos you can just play:
   `video/viva_full.mp4` (21 min, every file, the tests, how to prove it live,
   modification examples, 12 viva questions) and `video/viva.mp4` (11 min summary).
-- [docs/course/index.html](docs/course/index.html): an interactive 11-module course
-  (open the file in any browser, no server needed): real code with line numbers,
-  working models of the address split, the PTE bits, the TLB, the two-pass check and
-  the kernel-buffer crash, exercises with answers, and 12 viva flashcards.
+- [docs/course/index.html](docs/course/index.html): an interactive 7-module course built with the
+  [codebase-to-course](https://github.com/zarazhangrui/codebase-to-course) framework (open the file in
+  any browser, no server needed): real code beside plain English, animated call traces and chats,
+  simulators for the address split, PTE bits, TLB, overflow, two-pass check and the kernel-buffer
+  crash, quizzes, exercises with answers, and 12 viva flashcards.
 - [docs/HANDOVER.md](docs/HANDOVER.md): current state and history for anyone
   (or any AI assistant) continuing the work.
 - [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md): address → PTE → fault diagram and

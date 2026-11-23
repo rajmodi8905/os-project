@@ -1,0 +1,207 @@
+<section class="module" id="module-4" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">The Customs Desk</h1>
+      <p class="module-subtitle">setuvmwrite, the heart of the project, one block at a time: check everyone first, stamp everyone second, then clear the cache</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A border crossing for a group of travellers</h2>
+        <p>A tour bus arrives with five passengers. A careful inspector checks <em>all five</em> passports first. Only if every passport is fine does the officer stamp them. One bad passport and nobody gets stamped.</p>
+        <p>The function <code>setuvmwrite</code> works exactly like that, in five blocks.</p>
+
+        <div class="flow-steps">
+          <div class="flow-step"><div class="flow-step-num">1</div><p>Reject obviously bad requests</p></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step"><div class="flow-step-num">2</div><p>Compare counts (no overflow)</p></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step"><div class="flow-step-num">3</div><p>Pass one: inspect every page</p></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step"><div class="flow-step-num">4</div><p>Pass two: change the write bit</p></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step"><div class="flow-step-num">5</div><p>Clear the CPU cache</p></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Block 1: turn away the obviously wrong</h2>
+@@TB:vm.c:325:326@@
+        <p class="tl">Reject the request if: the start is not on a page boundary, the count is zero or negative, or the start is already past the end of the process.</p>
+        <p class="tl">Return -1. Nothing has been touched yet, so "failed" really does mean "unchanged".</p>
+@@/TB@@
+        <p>Because <code>npages</code> is a signed {{int}}, a negative count is caught by the same test.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Block 2: count first, multiply never (until it is safe)</h2>
+        <p>The obvious check is "start plus count times 4096 must be inside the process". It has a trap. Play with it below.</p>
+
+@@TB:vm.c:327:331@@
+        <p class="tl">A note from the author: compare page <em>counts</em> instead of computing the end address first.</p>
+        <p class="tl">The reason: the multiplication could {{overflow}} 32 bits and wrap to a small number.</p>
+        <p class="tl">How many whole pages fit between the start and the end of the process? If the request is bigger than that, reject it.</p>
+        <p class="tl">Return -1.</p>
+        <p class="tl">Only now is it safe to compute the end address, because we know it lies inside the process.</p>
+@@/TB@@
+
+        <div class="x-sim" id="ovf-sim">
+          <p class="x-st">Try it</p><h3>The overflow calculator</h3>
+          <p>Enter a start, a page count and the process size. See the naive check and ours, using real 32-bit arithmetic.</p>
+          <div class="x-row"><label for="o-va">va</label><input type="text" id="o-va" value="0x1000" spellcheck="false">
+            <label for="o-np">npages</label><input type="text" id="o-np" value="0x100000" spellcheck="false">
+            <label for="o-sz">sz</label><input type="text" id="o-sz" value="0x9000" spellcheck="false"></div>
+          <div class="x-row"><button class="btn" type="button" data-p="0x1000|0x100000|0x9000">wraps to 0</button><button class="btn" type="button" data-p="0x1000|8|0x9000">just fits</button>
+            <button class="btn" type="button" data-p="0x1000|9|0x9000">one too many</button><button class="btn" type="button" data-p="0x1000|-1|0x9000">negative</button></div>
+          <div id="o-out" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Block 3: pass one, inspect every page</h2>
+@@TB:vm.c:333:339@@
+        <p class="tl">A note: every page must already be present and owned by the user.</p>
+        <p class="tl">The {{guard page}} below the stack has its user bit cleared, so it will fail the test below.</p>
+        <p class="tl">Visit each page in the range, one page-size step at a time.</p>
+        <p class="tl">Look up its table entry. The <code>0</code> means "never create a page table while only checking".</p>
+        <p class="tl">If there is no entry, or it is not present, or it is not a user page...</p>
+        <p class="tl">...turn the whole request away. We have changed nothing yet.</p>
+        <p class="tl">End of the inspection {{loop}}. Everyone passed.</p>
+@@/TB@@
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Block 4: pass two, change only the write bit</h2>
+        <p>This loop runs only after pass one accepted every page. Try to break the "nothing changes on failure" promise yourself.</p>
+
+        <div class="x-sim" id="two-sim">
+          <p class="x-st">Try it</p><h3>The failed-call simulator</h3>
+          <p>Click a page to make it invalid, then run <code>mprotect(p, 5)</code> with each method.</p>
+          <div class="x-pages" id="two-pages" role="group" aria-label="Pages"></div>
+          <div class="x-row"><label><input type="radio" name="two-mode" value="one"> one pass (change as you go)</label>
+            <label><input type="radio" name="two-mode" value="two" checked> two passes (ours)</label>
+            <button class="btn btn-primary" type="button" id="two-run">Run mprotect(p, 5)</button><button class="btn" type="button" id="two-reset">Reset</button></div>
+          <div class="x-verdict" id="two-out" aria-live="polite">Choose a mode and run it.</div>
+        </div>
+
+@@TB:vm.c:341:348@@
+        <p class="tl">A note: pass two changes only the write bit.</p>
+        <p class="tl">Visit the same pages again.</p>
+        <p class="tl">Find each table entry (it exists, we just checked).</p>
+        <p class="tl">If we are unprotecting (<code>writable</code> is 1)...</p>
+        <p class="tl">...set the write bit with OR.</p>
+        <p class="tl">Otherwise we are protecting...</p>
+        <p class="tl">...clear the write bit with AND NOT. Every other bit, including the physical page, is untouched.</p>
+        <p class="tl">End of the loop.</p>
+@@/TB@@
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Block 5: tell the CPU to forget</h2>
+        <p>The CPU keeps a tiny {{cache}} of recent permission checks, like a sticky note on the guard's monitor that says "page 0x4000: writable". Change the real record and the note is out of date. Step through it.</p>
+
+        <div class="x-sim" id="tlb-sim">
+          <p class="x-st">Try it</p><h3>The stale sticky note</h3>
+          <div class="x-row"><label><input type="checkbox" id="tlb-flush" checked> our code reloads CR3 after the change</label>
+            <button class="btn btn-primary" type="button" id="tlb-next">Next step</button><button class="btn" type="button" id="tlb-reset">Reset</button></div>
+          <div class="x-flow" id="tlb-flow"></div>
+          <div class="x-verdict" id="tlb-say" aria-live="polite"></div>
+        </div>
+
+@@TB:vm.c:350:353@@
+        <p class="tl">A note: reloading CR3 flushes this CPU's cached ({{TLB}}) translations.</p>
+        <p class="tl"><code>lcr3</code> reloads the {{register}} that points at the page directory ({{CR3}}). <code>V2P</code> converts our kernel address into the physical address the CPU needs. This one line empties the cache.</p>
+        <p class="tl">Success.</p>
+        <p class="tl">End of the function.</p>
+@@/TB@@
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Caches are why "I changed it" is not "it changed"</strong>
+            <p>Anywhere a fast copy of a slow thing exists (a TLB, a browser cache, a CDN), changing the original is only half the job. You also have to invalidate the copy.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Spot the bug</h2>
+        <p>This is <em>not</em> the real code. It is a version with one planted mistake in the range check. Click the line that is wrong.</p>
+
+        <div class="bug-challenge">
+          <h3>Which line breaks the overflow protection?</h3>
+          <div class="bug-code">
+            <div class="bug-line" data-line="1" onclick="checkBugLine(this, false)" data-hint="That test is fine: alignment, count, and start are all checked."><span class="line-num">1</span><code>if(va % PGSIZE != 0 || npages &lt;= 0 || va &gt;= sz)</code></div>
+            <div class="bug-line" data-line="2" onclick="checkBugLine(this, false)" data-hint="Returning -1 here is correct."><span class="line-num">2</span><code>  return -1;</code></div>
+            <div class="bug-line bug-target" data-line="3" onclick="checkBugLine(this, true)" data-explanation="It multiplies before checking. npages * PGSIZE can wrap past 2 to the power 32 and become a small number, so the next test passes for a request that is far too big. Compare the page count with (sz - va) / PGSIZE instead."><span class="line-num">3</span><code>end = va + npages * PGSIZE;</code></div>
+            <div class="bug-line" data-line="4" onclick="checkBugLine(this, false)" data-hint="The comparison is reasonable; look at what feeds it."><span class="line-num">4</span><code>if(end &gt; sz)</code></div>
+            <div class="bug-line" data-line="5" onclick="checkBugLine(this, false)" data-hint="Returning -1 here is correct."><span class="line-num">5</span><code>  return -1;</code></div>
+          </div>
+          <div class="bug-feedback"></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">And fork? It already works</h2>
+        <p>One requirement needed no new code at all. When a process forks, xv6 copies each page <em>and its flags</em> into the child.</p>
+
+@@TB:vm.c:397:402@@
+        <p class="tl">Read the physical page of the parent's entry.</p>
+        <p class="tl">Remember all of its flags, including whether the write bit is set.</p>
+        <p class="tl">Get a fresh physical page for the child.</p>
+        <p class="tl">If memory has run out, bail out.</p>
+        <p class="tl">Copy the contents of the parent's page into the child's new page.</p>
+        <p class="tl">Map the child's page with the <em>same flags</em>. A protected page stays protected, in its own independent copy.</p>
+@@/TB@@
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <div class="quiz-container" id="quiz-module4">
+
+          <div class="quiz-question-block" data-correct="b"
+               data-explanation-right="A range that runs into an invalid page, such as the stack guard page, would leave earlier pages already changed. That is exactly what the atomic-rejection tests look for."
+               data-explanation-wrong="Think about which input makes a single loop leave work half done: a range whose last page is invalid. Pages before it would already be read-only when the function returns -1.">
+            <h3 class="quiz-question">To save time you merge pass one and pass two into a single loop. Which test input would expose the bug?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>A range of exactly one valid page.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>A range of valid pages followed by an invalid one, such as the stack guard page.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>An unaligned start address.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="c"
+               data-explanation-right="Each fork gives the child its own address space, and switching to it reloads CR3. A stale cache entry only shows up when the same process writes again with no switch in between."
+               data-explanation-wrong="The simple tests protect a page in the parent and let a forked child write. A newly forked child runs with a freshly loaded page directory, so no stale entry exists. You need a write by the same process, right after the change.">
+            <h3 class="quiz-question">You delete the <code>lcr3</code> line. Your tests that protect a page and then let a forked child write to it all still pass. Why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>lcr3 was never necessary.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The child writes before the parent finishes protecting.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The child runs with its own freshly loaded page directory, so it never sees the stale cache. Only the same process writing right after the change would.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="a"
+               data-explanation-right="0x100000 pages times 4096 is 2 to the power 32, which wraps to 0 in 32-bit arithmetic. The naive end becomes the start address, which looks perfectly valid."
+               data-explanation-wrong="Compute 0x100000 times 4096 in 32 bits. It is exactly 2^32, which wraps to 0, so the end equals the start. Use the overflow calculator above to check.">
+            <h3 class="quiz-question">A process has 36 KB of memory (<code>sz = 0x9000</code>). A buggy program calls <code>mprotect(0x1000, 0x100000)</code>. What does a naive "<code>va + npages*4096 &lt;= sz</code>" check conclude?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It accepts: the multiplication wraps around to 0, so the end looks tiny.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It rejects, because the count is too large.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It crashes the kernel.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module4')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

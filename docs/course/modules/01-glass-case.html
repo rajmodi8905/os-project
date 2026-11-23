@@ -1,0 +1,135 @@
+<section class="module" id="module-1" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">The Glass Case</h1>
+      <p class="module-subtitle">What happens when a program locks part of its own memory, and why that is harder than flipping one switch</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Look, but do not touch</h2>
+        <p>Think of a museum display case. Everyone can see what is inside, but the glass stops anyone reaching in. Our project builds that glass for a program's own <span class="term" data-definition="The numbered storage a running program reads and writes. The hardware divides it into pages.">memory</span>.</p>
+        <p>A program calls <span class="term" data-definition="A system call that makes pages read-only. Say it as &quot;em-protect&quot;. Its partner munprotect undoes it.">mprotect</span> on a few pages. From then on it can still <em>read</em> them. The moment anything tries to <em>write</em>, the <span class="term" data-definition="The physical machine itself: the CPU, memory and the circuits that check permissions. Software asks; hardware enforces.">hardware</span> slams shut.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🔒</div>
+            <h4 class="pattern-title">mprotect(addr, len)</h4>
+            <p class="pattern-desc">Put glass over <code>len</code> pages starting at <code>addr</code>. Reads still work, writes are refused.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🔓</div>
+            <h4 class="pattern-title">munprotect(addr, len)</h4>
+            <p class="pattern-desc">Take the glass off again. The pages are writable as before.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">📏</div>
+            <h4 class="pattern-title">len counts pages</h4>
+            <p class="pattern-desc">Not bytes. One <span class="term" data-definition="A fixed block of memory, 4096 bytes on x86. Permissions are set per page, never per byte.">page</span> is 4096 bytes, and <code>addr</code> must start exactly on a page boundary.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch it happen, for real</h2>
+        <p>This is the real output of the demo program <code>vmdemo 7 3</code>, run inside the xv6 guest. Read it top to bottom.</p>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">REAL OUTPUT · guest_output.txt · lines 3-10</span>
+    <pre><code><span class="code-line">[1] 3 page(s) at 0x4000, writable control</span>
+<span class="code-line">      stored and read back 7 ... 9</span>
+<span class="code-line"> </span>
+<span class="code-line">[2] mprotect(0x4000, 3) = 0</span>
+<span class="code-line">      protected read still works: 7</span>
+<span class="code-line">pid 4 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x6000--kill proc</span>
+<span class="code-line">      child write of 107 to 0x6000: STOPPED by page fault (child killed)</span>
+<span class="code-line">      parent still alive, value unchanged: 9</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">Scene 1: three pages are writable. The program stores 7, 8, 9 and reads them back.</p>
+        <p class="tl">Scene 2: <code>mprotect</code> returned 0, meaning success. Reading still works: you can look through the glass.</p>
+        <p class="tl">A child process now tries to write. The <span class="term" data-definition="The processor that runs instructions. It checks the permission bits on every single memory access.">CPU</span> raises <code>trap 14 err 7</code>: a write to a protected page.</p>
+        <p class="tl">That child is killed. Only the one who touched the glass.</p>
+        <p class="tl">The parent is untouched. 9 is still 9.</p>
+        <p class="tl">That last line is the whole point: a protected write must hurt only the program that tried it.</p>
+    </div>
+  </div>
+</div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Permission belongs to a whole page</strong>
+            <p>The hardware cannot protect 100 bytes in the middle of a page. It only knows pages. So everything on the same page shares one fate.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Six rules that make it hard</h2>
+        <p>Flipping one <span class="term" data-definition="A single 0 or 1. A permission like writable is stored as one bit inside a larger number.">bit</span> sounds easy. These six rules are what the rest of the course is about.</p>
+
+        <div class="step-cards">
+          <div class="step-card"><div class="step-num">1</div><div class="step-body"><strong>Reads must still work</strong><p>Clear only the write bit, nothing else. Module 3.</p></div></div>
+          <div class="step-card"><div class="step-num">2</div><div class="step-body"><strong>A write kills only that <span class="term" data-definition="A running program with its own private memory. Killing one process does not affect another.">process</span></strong><p>The system keeps running. Modules 3 and 6.</p></div></div>
+          <div class="step-card"><div class="step-num">3</div><div class="step-body"><strong>A failed call changes nothing</strong><p>No half-protected ranges. Module 4.</p></div></div>
+          <div class="step-card"><div class="step-num">4</div><div class="step-body"><strong>The change is immediate</strong><p>The CPU keeps a cache that can still say "writable". Module 4.</p></div></div>
+          <div class="step-card"><div class="step-num">5</div><div class="step-body"><strong>Protection survives <span class="term" data-definition="A system call that creates a child process: a copy of the parent with its own copy of every page.">fork</span></strong><p>The child copy is protected too, and independent. Module 4.</p></div></div>
+          <div class="step-card"><div class="step-num">6</div><div class="step-body"><strong>The <span class="term" data-definition="The privileged core of the operating system. It runs with more rights than ordinary programs and handles system calls.">kernel</span> must not be fooled</strong><p>Asking the kernel to write into your protected page must not crash it. Module 5.</p></div></div>
+        </div>
+        <p>Out of scope: protecting address 0 (<span class="term" data-definition="A pointer to address 0. Most systems protect page 0 so that using it by mistake crashes loudly. Out of scope here.">null pointers</span>), <span class="term" data-definition="Moving memory pages out to disk when RAM is full, and back later. Not part of this project.">swapping</span>, <span class="term" data-definition="A trick where parent and child share pages after fork and only copy a page when one of them writes it. xv6 here copies up front instead.">copy-on-write</span>, and <span class="term" data-definition="An independent flow of execution inside one process that shares its memory. xv6 here has none, which makes the check-then-write safe.">threads</span>.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <div class="quiz-container" id="quiz-module1">
+
+          <div class="quiz-question-block" data-correct="b"
+               data-explanation-right="Permission is per page, so protecting 100 bytes protects the whole 4096-byte page they live on, including everything else stored there."
+               data-explanation-wrong="Think about what unit the hardware tracks. It tracks pages, so a small struct shares the glass with everything else on its page. A good fix is to give it its own page.">
+            <h3 class="quiz-question">A teammate wants to protect only the 100-byte settings struct stored in the middle of a page that also holds other variables. What do you tell them?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Call <code>mprotect(addr, 100)</code>: the length is in bytes.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>You can only protect whole pages, so the other variables on that page get protected too. Put the struct on its own page first.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It cannot be done at all; mprotect only works on code.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="c"
+               data-explanation-right="The fork copies the page along with its permission flags, so the child inherits the glass. The parent is a separate copy and is unaffected."
+               data-explanation-wrong="Remember rule 5. A forked child gets its own copy of every page, with the same permission flags, so a write in the child still hits the glass.">
+            <h3 class="quiz-question">A program protects a page, then forks. The child immediately writes to that page. What do you expect?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The write succeeds, because the child is a new process.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Both the parent and the child are killed.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The child is killed by a page fault; the parent keeps running.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="a"
+               data-explanation-right="A call that returns -1 must leave everything as it found it. Otherwise the caller cannot tell which pages are protected, and the error is worse than the original problem."
+               data-explanation-wrong="Imagine you receive -1 and then try to continue. If some pages changed anyway, you no longer know the state of your own memory. Failed means unchanged.">
+            <h3 class="quiz-question">You call <code>mprotect(p, 5)</code>. Page 3 of the 5 is not mapped, so the call returns -1. A buggy kernel had already protected pages 0, 1 and 2 before noticing. Why is that a bug?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>A failed call must change nothing, otherwise the caller cannot reason about the state of its memory.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Pages 0 to 2 should have been left writable only for speed.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It is not a bug; partial work is fine as long as -1 is returned.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module1')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module1')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

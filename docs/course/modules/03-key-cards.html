@@ -1,0 +1,264 @@
+<section class="module" id="module-3" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">Key Cards</h1>
+      <p class="module-subtitle">How an address becomes a page, and the three permission bits the hardware checks every time you touch memory</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A hotel with floors, rooms and key cards</h2>
+        <p>To find your bed you need a floor, a room on that floor, and a spot inside the room. A 32-bit <span class="term" data-definition="The address a program uses. The CPU translates it to a real physical address through the page table.">virtual address</span> is split the same way: a floor number (10 <span class="term" data-definition="A single 0 or 1. A permission like writable is stored as one bit inside a larger number.">bits</span>), a room number (10 bits), and a spot inside the room (12 bits).</p>
+        <p>Each room has a lock record with permissions. That record is what we are about to edit. Type an address and watch it split.</p>
+
+        <div class="x-sim" id="addr-sim">
+          <p class="x-st">Try it</p><h3>Address splitter</h3>
+          <div class="x-row"><label for="addr-in">Address (hex)</label><input type="text" id="addr-in" value="0x00404010" spellcheck="false" autocomplete="off">
+            <button class="btn" type="button" data-a="0x00004000">0x4000</button><button class="btn" type="button" data-a="0x00004fff">0x4fff</button>
+            <button class="btn" type="button" data-a="0x00403010">0x403010</button><button class="btn" type="button" data-a="0x80000000">0x80000000</button></div>
+          <div id="addr-out" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The CPU's walk to the room</h2>
+        <p>Every single memory access makes this walk. Step through it once.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-c3-1","label":"The program uses the virtual address 0x00404010. It has no idea where that really is."},
+          {"highlight":"flow-c3-2","label":"The CPU starts from CR3, a register holding the physical address of this process page directory.","packet":true,"from":"c3-1","to":"c3-2"},
+          {"highlight":"flow-c3-3","label":"The top 10 bits (PDX = 1) pick one of 1024 directory entries. That entry points to a page table.","packet":true,"from":"c3-2","to":"c3-3"},
+          {"highlight":"flow-c3-4","label":"The next 10 bits (PTX = 4) pick one entry inside that page table: the PTE.","packet":true,"from":"c3-3","to":"c3-4"},
+          {"highlight":"flow-c3-4","label":"The PTE holds the physical page number and the permission bits. This is where the key card is checked."},
+          {"highlight":"flow-c3-5","label":"If the permissions allow it, the low 12 bits (the offset) pick the exact byte inside the physical page.","packet":true,"from":"c3-4","to":"c3-5"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-c3-1"><div class="flow-actor-icon">A</div><span>Address</span></div>
+            <div class="flow-actor" id="flow-c3-2"><div class="flow-actor-icon">3</div><span>CR3</span></div>
+            <div class="flow-actor" id="flow-c3-3"><div class="flow-actor-icon">D</div><span>Directory</span></div>
+            <div class="flow-actor" id="flow-c3-4"><div class="flow-actor-icon">T</div><span>Page table</span></div>
+            <div class="flow-actor" id="flow-c3-5"><div class="flow-actor-icon">M</div><span>Physical page</span></div>
+          </div>
+          <div class="flow-packet"></div>
+          <div class="flow-step-label">Click "Next Step" to begin</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The real macros that do the splitting</h2>
+        <p>These <span class="term" data-definition="A named template the compiler expands before compiling. #define lines in C, and SYSCALL in usys.S, are macros.">macros</span> come straight from <code>mmu.h</code>, the file that defines the hardware's layout for xv6.</p>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · mmu.h · lines 73-77</span>
+    <pre><code><span class="code-line"><span class="code-comment">// page directory index</span></span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PDX(va)         (((uint)(va) &gt;&gt; PDXSHIFT) &amp; 0x3FF)</span></span>
+<span class="code-line"> </span>
+<span class="code-line"><span class="code-comment">// page table index</span></span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PTX(va)         (((uint)(va) &gt;&gt; PTXSHIFT) &amp; 0x3FF)</span></span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">A label: the next macro finds the floor.</p>
+        <p class="tl">PDX: shift the address right by 22 bits and keep 10 bits. That is the directory index.</p>
+        <p class="tl">Another label: now the room.</p>
+        <p class="tl">PTX: shift right by 12 bits and keep 10 bits. That is the page table index.</p>
+    </div>
+  </div>
+</div>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · mmu.h · lines 85-91</span>
+    <pre><code><span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PGSIZE          4096    </span><span class="code-comment">// bytes mapped by a page</span></span>
+<span class="code-line"> </span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PTXSHIFT        12      </span><span class="code-comment">// offset of PTX in a linear address</span></span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PDXSHIFT        22      </span><span class="code-comment">// offset of PDX in a linear address</span></span>
+<span class="code-line"> </span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PGROUNDUP(sz)  (((sz)+PGSIZE-1) &amp; ~(PGSIZE-1))</span></span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PGROUNDDOWN(a) (((a)) &amp; ~(PGSIZE-1))</span></span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">A page is 4096 bytes. The whole project is built on this number.</p>
+        <p class="tl">The two shift distances used above.</p>
+        <p class="tl">PGROUNDUP: round an address <em>up</em> to the next page start.</p>
+        <p class="tl">PGROUNDDOWN: clear the low 12 bits to find the start of the page an address is on.</p>
+    </div>
+  </div>
+</div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Page number and offset are just division</strong>
+            <p>page number = address / 4096, and offset = address % 4096. Because 4096 is 2 to the power 12, "divide" means "drop the low 12 bits".</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The key card: three bits we care about</h2>
+        <p>The <span class="term" data-definition="Page table entry: a 32-bit value holding a physical page number and permission flags such as present, writable and user.">PTE</span> stores the <span class="term" data-definition="The real location in RAM. Programs never see it; the page table hides it.">physical page</span> in its top 20 bits and the permission bits in its low 12. We use three. The orange one is our entire project.</p>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · mmu.h · lines 93-101</span>
+    <pre><code><span class="code-line"><span class="code-comment">// Page table/directory entry flags.</span></span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PTE_P           0x001   </span><span class="code-comment">// Present</span></span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PTE_W           0x002   </span><span class="code-comment">// Writeable</span></span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PTE_U           0x004   </span><span class="code-comment">// User</span></span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PTE_PS          0x080   </span><span class="code-comment">// Page Size</span></span>
+<span class="code-line"> </span>
+<span class="code-line"><span class="code-comment">// Address in page table or page directory entry</span></span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PTE_ADDR(pte)   ((uint)(pte) &amp; ~0xFFF)</span></span>
+<span class="code-line"><span class="code-keyword">#</span><span class="code-keyword">define PTE_FLAGS(pte)  ((uint)(pte) &amp;  0xFFF)</span></span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">The permission flags that live in the low 12 bits of every entry.</p>
+        <p class="tl"><b>P</b> (present): the room exists and is mapped.</p>
+        <p class="tl"><b>W</b> (writable): guests may rearrange the furniture. <em>Our project toggles this bit.</em></p>
+        <p class="tl"><b>U</b> (user): ordinary programs may enter, not just the kernel.</p>
+        <p class="tl">A flag xv6 uses for big pages. We never touch it.</p>
+        <p class="tl">Two more labels.</p>
+        <p class="tl">PTE_ADDR: keep the top 20 bits, which are the physical page.</p>
+        <p class="tl">PTE_FLAGS: keep the low 12 bits, which are the permissions.</p>
+    </div>
+  </div>
+</div>
+
+        <div class="x-sim" id="pte-sim">
+          <p class="x-st">Try it</p><h3>PTE lab</h3>
+          <p>Press a button or flip a flag yourself. Watch the table.</p>
+          <div class="x-pte" id="pte-bits" aria-hidden="true"></div>
+          <div class="x-legend"><span>blue: physical page (fixed at 0x00123)</span><span>green: flag is 1</span><span class="x-w">orange outline: the write bit</span></div>
+          <div class="x-row">
+            <button class="btn btn-primary" type="button" id="pte-mp">mprotect: *pte &amp;= ~PTE_W</button>
+            <button class="btn" type="button" id="pte-mu">munprotect: *pte |= PTE_W</button>
+            <label><input type="checkbox" id="pte-p" checked> PTE_P</label><label><input type="checkbox" id="pte-w" checked> PTE_W</label>
+            <label><input type="checkbox" id="pte-u" checked> PTE_U</label><label><input type="checkbox" id="pte-wp" checked> CR0.WP set</label></div>
+          <dl class="x-kv"><dt>PTE value</dt><dd id="pte-hex"></dd><dt>Last operation</dt><dd id="pte-op">none yet</dd></dl>
+          <div class="x-tw"><table><tr><th>Access</th><th>Result</th><th>What the CPU reports</th></tr>
+            <tr><td>User reads the page</td><td id="r-ur"></td><td id="e-ur"></td></tr>
+            <tr><td>User writes the page</td><td id="r-uw"></td><td id="e-uw"></td></tr>
+            <tr><td>Kernel writes the page</td><td id="r-kw"></td><td id="e-kw"></td></tr></table></div>
+        </div>
+        <p>Turn off <b>CR0.WP</b> and look at the third row. The kernel would silently write through the glass. xv6 turns it on, which causes a surprise in Module 5.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Match the operation to its effect</h2>
+        <p>Drag each line of code onto what it does.</p>
+        <div class="dnd-container" id="dnd-m3">
+          <div class="dnd-chips">
+            <div class="dnd-chip" draggable="true" data-answer="clear"><code>*pte &amp;= ~PTE_W</code></div>
+            <div class="dnd-chip" draggable="true" data-answer="set"><code>*pte |= PTE_W</code></div>
+            <div class="dnd-chip" draggable="true" data-answer="test"><code>(*pte &amp; PTE_W) != 0</code></div>
+            <div class="dnd-chip" draggable="true" data-answer="addr"><code>PTE_ADDR(*pte)</code></div>
+          </div>
+          <div class="dnd-zones">
+            <div class="dnd-zone" data-correct="clear"><p class="dnd-zone-label">Make the page read-only. Every other bit stays as it was.</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="set"><p class="dnd-zone-label">Make the page writable again.</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="test"><p class="dnd-zone-label">Ask: is this page currently writable?</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="addr"><p class="dnd-zone-label">Get the physical page and ignore all flags.</p><div class="dnd-zone-target">Drop here</div></div>
+          </div>
+          <button class="quiz-check-btn" onclick="checkDnD('dnd-m3')">Check Matches</button>
+          <button class="quiz-reset-btn" onclick="resetDnD('dnd-m3')">Reset</button>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">When the key card is refused</h2>
+        <p>If user code writes a read-only page, the <span class="term" data-definition="The processor that runs instructions. It checks the permission bits on every single memory access.">CPU</span> raises <span class="term" data-definition="A transfer of control into the kernel caused by an event: a system call, a fault, or an interrupt. Trap 14 is a page fault.">trap</span> number 14, a <span class="term" data-definition="The CPU&#x27;s complaint when an access is not allowed, for example writing a read-only page. xv6 kills the process that caused it.">page fault</span>. xv6's existing handler runs. This is the code that prints the message you saw in Module 1.</p>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · trap.c · lines 89-94</span>
+    <pre><code><span class="code-line">    <span class="code-comment">// In user space, assume process misbehaved.</span></span>
+<span class="code-line">    cprintf(<span class="code-string">&quot;</span><span class="code-string">pid %d %s: trap %d err %d on cpu %d </span><span class="code-string">&quot;</span></span>
+<span class="code-line">            <span class="code-string">&quot;</span><span class="code-string">eip 0x%x addr 0x%x--kill proc</span><span class="code-string">\n</span><span class="code-string">&quot;</span>,</span>
+<span class="code-line">            myproc()<span class="code-operator">-</span><span class="code-operator">&gt;</span>pid, myproc()<span class="code-operator">-</span><span class="code-operator">&gt;</span>name, tf<span class="code-operator">-</span><span class="code-operator">&gt;</span>trapno,</span>
+<span class="code-line">            tf<span class="code-operator">-</span><span class="code-operator">&gt;</span>err, cpuid(), tf<span class="code-operator">-</span><span class="code-operator">&gt;</span>eip, rcr2());</span>
+<span class="code-line">    myproc()<span class="code-operator">-</span><span class="code-operator">&gt;</span>killed <span class="code-operator">=</span> <span class="code-number">1</span>;</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">The fault came from user mode, so assume that program misbehaved.</p>
+        <p class="tl">Print a message: which process, which trap, and the error code.</p>
+        <p class="tl">(the message continues) Also the instruction address and the bad address, then say "kill proc".</p>
+        <p class="tl">Arguments: pid, process name, trap number, then the error code <code>tf-&gt;err</code>.</p>
+        <p class="tl">...and the faulting address from the <span class="term" data-definition="A CPU register that holds the address that caused the most recent page fault. rcr2() reads it.">CR2 register</span>.</p>
+        <p class="tl">Mark <em>only this process</em> as killed. The parent never hears about it.</p>
+    </div>
+  </div>
+</div>
+
+        <div class="x-sim" id="err-sim">
+          <p class="x-st">Try it</p><h3>Error code decoder</h3>
+          <p>The error code is three bits. Set them like the CPU would.</p>
+          <div class="x-row"><label><input type="checkbox" id="err-p"> bit 0: page was present (1)</label>
+            <label><input type="checkbox" id="err-w"> bit 1: it was a write (2)</label><label><input type="checkbox" id="err-u"> bit 2: user mode (4)</label></div>
+          <div class="x-verdict" id="err-out" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <div class="quiz-container" id="quiz-module3">
+
+          <div class="quiz-question-block" data-correct="c"
+               data-explanation-right="0x...5 is binary 101: present and user, but the write bit (2) is clear. A user write to a present page that refuses writes is 1 + 2 + 4 = 7."
+               data-explanation-wrong="Decode the low bits. 5 is binary 101: P and U are set, W is not. The access is a write (2), by a user (4), to a present page (1). Add them up.">
+            <h3 class="quiz-question">A page table entry reads <code>0x00123005</code> and the program tries to write to that page. What does the kernel print?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>trap 14 err 4</code></span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>trap 14 err 6</code></span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>trap 14 err 7</code></span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="b"
+               data-explanation-right="The page that holds 0x5ff0 starts at 0x5000. Pages begin where the low 12 bits are zero, and the helper rejects any other start address."
+               data-explanation-wrong="Drop the low 12 bits of 0x5ff0. The page starts at 0x5000 (the same thing PGROUNDDOWN computes). The call needs a page-aligned address.">
+            <h3 class="quiz-question">You need to protect the page that holds the variable at address <code>0x5ff0</code>. What start address do you pass to mprotect?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>0x5ff0</code>, the exact address of the variable.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>0x5000</code>, the start of its page.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>0x6000</code>, the next page.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="a"
+               data-explanation-right="Assigning the whole entry also overwrites the physical page number and any other flags. Masking changes exactly one bit and leaves the rest alone."
+               data-explanation-wrong="Think about what else lives in that 32-bit value: the physical page number and other flags. Writing a constant replaces all of it, not just the W bit.">
+            <h3 class="quiz-question">A teammate proposes making a page read-only by writing <code>*pte = 0x00123005</code>. Why is this a bad idea?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It overwrites the whole entry, including the physical page and other flags, instead of changing one bit.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Constants cannot be written into page table entries.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It would make the page writable instead of read-only.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module3')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module3')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

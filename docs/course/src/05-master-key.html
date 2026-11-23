@@ -1,0 +1,239 @@
+<section class="module" id="module-5" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">The Master Key</h1>
+      <p class="module-subtitle">The bug we only found by testing: the kernel itself can crash on a page we just protected</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A courier with a master key</h2>
+        <p>A building courier carries a master key that opens every door. A "Do Not Enter" sign is on one room. A careless courier uses the master key anyway, walks in, and trips the alarm for the whole building.</p>
+        <p>The {{kernel}} is that courier. When a program asks it to copy data into a {{buffer}}, the kernel does the writing. If that buffer is on a protected page, <em>the kernel</em> is the one who hits the glass.</p>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">We reproduced this crash before fixing it</strong>
+            <p>A test that called <code>read()</code> from a pipe into a protected page brought down the whole guest. This is the real output.</p>
+          </div>
+        </div>
+
+@@TB:video/assets/panic_output.txt:1:2:plain@@
+        <p class="tl">The CPU raised trap 14, a {{page fault}}, but this time the code running was the <em>kernel</em>, not a user program.</p>
+        <p class="tl">xv6 treats any kernel-mode fault as a kernel bug and calls {{panic|<code>panic</code>}}. The whole machine stops.</p>
+@@/TB@@
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why the kernel is not exempt</h2>
+        <p>xv6 sets a CPU switch called {{CR0.WP|<code>CR0.WP</code>}} when it boots. With it on, even kernel code must respect read-only pages.</p>
+
+@@TB:entry.S:53:56@@
+        <p class="tl">A note: turn on paging.</p>
+        <p class="tl">Read the control register 0 into a working register.</p>
+        <p class="tl">Set two bits: PG (use page tables) and <b>WP</b> (write-protect: the kernel obeys read-only pages too).</p>
+        <p class="tl">Write it back to the CPU. From now on the kernel needs permission like everyone else.</p>
+@@/TB@@
+
+        <p>Watch the story as a conversation between the four parts involved.</p>
+
+        <div class="chat-window" id="chat-module5">
+          <div class="chat-messages">
+            <div class="chat-message" data-msg="0" data-sender="read" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">R</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-1)">read()</span><p>Kernel, please copy 2 bytes from the pipe into my buffer at 0x5000. That page is protected.</p></div>
+            </div>
+            <div class="chat-message" data-msg="1" data-sender="kernel" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">K</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-2)">Kernel</span><p>Sure. Copying "xy" to 0x5000 right now. I have the master key, after all.</p></div>
+            </div>
+            <div class="chat-message" data-msg="2" data-sender="cpu" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">C</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-3)">CPU</span><p>STOP. That page is read-only and CR0.WP is on. Master key or not, no writes. Trap 14!</p></div>
+            </div>
+            <div class="chat-message" data-msg="3" data-sender="trap" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">T</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-4)">Trap handler</span><p>Who caused it? The code segment says ring 0, the kernel itself. A user mistake I can punish; a kernel mistake I cannot. <code>panic</code>.</p></div>
+            </div>
+            <div class="chat-message" data-msg="4" data-sender="read" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">R</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-1)">read()</span><p>Wait. I only asked for a copy and the whole machine died?</p></div>
+            </div>
+            <div class="chat-message" data-msg="5" data-sender="kernel" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">K</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-2)">Kernel</span><p>New rule. Before I write into any user buffer I call <code>checkuvmwrite</code>. If any page is read-only I return -1 and touch nothing.</p></div>
+            </div>
+            <div class="chat-message" data-msg="6" data-sender="read" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">R</div>
+              <div class="chat-bubble"><span class="chat-sender" style="color: var(--color-actor-1)">read()</span><p>An error code I can handle. Thank you.</p></div>
+            </div>
+          </div>
+          <div class="chat-typing" id="chat-typing-m5" style="display:none">
+            <div class="chat-avatar" id="chat-module5-typing-avatar">?</div>
+            <div class="chat-typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>
+          </div>
+          <div class="chat-controls">
+            <button class="btn chat-next-btn">Next Message</button>
+            <button class="btn chat-all-btn">Play All</button>
+            <button class="btn chat-reset-btn">Replay</button>
+            <span class="chat-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Which calls write into your memory?</h2>
+        <p>Only the calls where the <em>kernel writes into your buffer</em> need the new check. Try the simulator, then match the calls.</p>
+
+        <div class="x-sim" id="kb-sim">
+          <p class="x-st">Try it</p><h3>The syscall simulator</h3>
+          <div class="x-row"><label for="kb-call">System call</label><select id="kb-call">
+            <option value="read">read(fd, buf, n): kernel WRITES into buf</option><option value="fstat">fstat(fd, &amp;st): kernel WRITES into st</option>
+            <option value="pipe">pipe(fd): kernel WRITES into fd[2]</option><option value="write">write(fd, buf, n): kernel only READS buf</option></select>
+            <label for="kb-page">Buffer page</label><select id="kb-page"><option value="ro">protected (read-only)</option><option value="rw">writable</option></select>
+            <label><input type="checkbox" id="kb-fix" checked> our check (<code>argptrw</code>) is in place</label></div>
+          <div class="x-verdict" id="kb-out" aria-live="polite"></div>
+        </div>
+
+        <div class="dnd-container" id="dnd-m5">
+          <div class="dnd-chips">
+            <div class="dnd-chip" draggable="true" data-answer="read"><code>read</code></div>
+            <div class="dnd-chip" draggable="true" data-answer="write"><code>write</code></div>
+            <div class="dnd-chip" draggable="true" data-answer="fstat"><code>fstat</code></div>
+            <div class="dnd-chip" draggable="true" data-answer="pipe"><code>pipe</code></div>
+          </div>
+          <div class="dnd-zones">
+            <div class="dnd-zone" data-correct="read"><p class="dnd-zone-label">Copies file data INTO your buffer. Needs the new check.</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="write"><p class="dnd-zone-label">Copies YOUR buffer out to a file. The kernel only reads, so no check.</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="fstat"><p class="dnd-zone-label">Fills in a struct you handed it. Needs the new check.</p><div class="dnd-zone-target">Drop here</div></div>
+            <div class="dnd-zone" data-correct="pipe"><p class="dnd-zone-label">Writes two descriptor numbers into an array you gave it. Needs the new check.</p><div class="dnd-zone-target">Drop here</div></div>
+          </div>
+          <button class="quiz-check-btn" onclick="checkDnD('dnd-m5')">Check Matches</button>
+          <button class="quiz-reset-btn" onclick="resetDnD('dnd-m5')">Reset</button>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The fix, in four small pieces</h2>
+        <p>First the checker itself. It walks every page the buffer touches, so a buffer that starts on a writable page and runs onto a protected one is caught too.</p>
+
+@@TB:vm.c:367:376@@
+        <p class="tl">A length of zero means nothing will be written, so there is nothing to check.</p>
+        <p class="tl">(the return for that case)</p>
+        <p class="tl">Find the page that holds the <em>last</em> byte of the buffer.</p>
+        <p class="tl">Loop from the first page to that last page, one page at a time.</p>
+        <p class="tl">Look up each page's table entry. Never create one while checking.</p>
+        <p class="tl">All three flags must be set: present, user, writable. Anything less is refused with -1.</p>
+        <p class="tl">(the refusal)</p>
+        <p class="tl">After the last page, stop. Without this the loop would run on forever.</p>
+        <p class="tl">(the exit)</p>
+        <p class="tl">End of the loop. Every page passed.</p>
+@@/TB@@
+
+        <p>Then a thin wrapper that adds the check to the existing bounds test.</p>
+
+@@TB:syscall.c:74:80@@
+        <p class="tl">A new helper next to the old <code>argptr</code>.</p>
+        <p class="tl">Its name says it all: "argument pointer, writable".</p>
+        <p class="tl">(open brace)</p>
+        <p class="tl">First do the old check: is the buffer even inside the process? If not, fail.</p>
+        <p class="tl">(the failure)</p>
+        <p class="tl">Then run the new check on the same buffer and return its answer.</p>
+        <p class="tl">(close brace)</p>
+@@/TB@@
+
+        <p>Three callers changed by exactly one word each: <code>argptr</code> became <code>argptrw</code>.</p>
+
+@@TB:sysfile.c:76:78@@
+        <p class="tl">In <code>sys_read</code>: get the file, the length, and the buffer, and now require the buffer to be <em>writable</em>. The same one-word change was made in <code>sys_fstat</code> (line 112) and <code>sys_pipe</code> (line 429).</p>
+        <p class="tl">If any of that fails, return -1 without touching anything.</p>
+        <p class="tl">Only now do the real work of reading into the buffer.</p>
+@@/TB@@
+
+        <p>One more backdoor. <code>copyout</code> writes through the kernel's own mapping of the page, which is always writable, so it would bypass the user's protection.</p>
+
+@@TB:vm.c:441:445@@
+        <p class="tl">Find the kernel's own alias of the user's page.</p>
+        <p class="tl">If there is none, fail.</p>
+        <p class="tl">Our one added line: the user's mapping must also be writable.</p>
+        <p class="tl">Otherwise refuse.</p>
+        <p class="tl">(the refusal)</p>
+@@/TB@@
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Spot the bug</h2>
+        <p>Again, not the real code: one planted mistake in <code>checkuvmwrite</code>'s test. Click the wrong line.</p>
+
+        <div class="bug-challenge">
+          <h3>Which line makes the check reject good pages?</h3>
+          <div class="bug-code">
+            <div class="bug-line" data-line="1" onclick="checkBugLine(this, false)" data-hint="Looking up the entry is fine."><span class="line-num">1</span><code>pte = walkpgdir(pgdir, (void*)a, 0);</code></div>
+            <div class="bug-line bug-target" data-line="2" onclick="checkBugLine(this, true)" data-explanation="It rejects a page if ANY of the three flags is set, the opposite of the intent. A good page has all three set, so it is refused. The test must reject when the entry is missing or the three flags are NOT all set: (*pte &amp; (PTE_P|PTE_U|PTE_W)) != (PTE_P|PTE_U|PTE_W)."><span class="line-num">2</span><code>if(pte == 0 || (*pte &amp; (PTE_P|PTE_U|PTE_W)) != 0)</code></div>
+            <div class="bug-line" data-line="3" onclick="checkBugLine(this, false)" data-hint="Returning -1 is the right way to refuse."><span class="line-num">3</span><code>  return -1;</code></div>
+            <div class="bug-line" data-line="4" onclick="checkBugLine(this, false)" data-hint="Stopping after the last page is correct."><span class="line-num">4</span><code>if(a == last)</code></div>
+            <div class="bug-line" data-line="5" onclick="checkBugLine(this, false)" data-hint="That break is how the loop ends."><span class="line-num">5</span><code>  break;</code></div>
+          </div>
+          <div class="bug-feedback"></div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🔬</div>
+          <div class="callout-content">
+            <strong class="callout-title">Safe here, not everywhere</strong>
+            <p>Checking and then writing is safe because xv6 here has one CPU and no threads, so nothing can change the page in between. A multi-CPU kernel would need a {{lock}}, or a way to survive the fault.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <div class="quiz-container" id="quiz-module5">
+
+          <div class="quiz-question-block" data-correct="a"
+               data-explanation-right="The kernel writes into the program's memory, so it must use the writable check. A call that only reads a buffer would use plain argptr."
+               data-explanation-wrong="Ask who does the writing. gettime(buf) makes the kernel write into the user buffer, exactly like read(), so it needs argptrw.">
+            <h3 class="quiz-question">You add a system call <code>gettime(char *buf)</code> that copies the current time into the program's buffer. Which argument helper should it use?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>argptrw</code>, because the kernel writes into the buffer.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span><code>argptr</code>, because it only needs the buffer to be inside the process.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Neither; the CPU already checks it.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="b"
+               data-explanation-right="write() only reads the buffer, so a protected page is a perfectly good source. Read-only means read allowed."
+               data-explanation-wrong="Who is writing? In write(), the kernel only reads your buffer and writes to the file. Reading a protected page is allowed, so the call works.">
+            <h3 class="quiz-question">An examiner asks: a program protects a page holding the text "hello" and then calls <code>write(1, p, 5)</code> to print it. Does that work?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>No, protected pages cannot be used with system calls at all.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Yes: the kernel only reads the buffer, so read-only is fine. <code>sys_write</code> keeps plain <code>argptr</code>.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Yes, but only if the page is unprotected first.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="c"
+               data-explanation-right="copyout writes through the kernel's own always-writable mapping, so it would silently bypass the user's read-only protection. The check completes the guarantee even though today's only caller is safe."
+               data-explanation-wrong="The danger is the route, not the caller. Writing through the kernel's own mapping ignores the user's PTE_W, so without a check the protection could be bypassed by any future caller.">
+            <h3 class="quiz-question">The only caller of <code>copyout</code> today is <code>exec</code>, writing to a brand-new stack. Why did we still add a writable check inside it?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>exec often crashes without it.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It speeds up the copy.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It writes through the kernel's always-writable mapping, so it would bypass the protection for any future caller.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module5')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module5')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

@@ -1,0 +1,283 @@
+<section class="module" id="module-7" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">07</span>
+      <h1 class="module-title">Make It Yours</h1>
+      <p class="module-subtitle">Change the code without help, rehearse the questions, and walk into the viva knowing every line</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The examiner hands you the wheel</h2>
+        <p>A driving examiner does not ask you to recite the highway code. They say "pull out, take the second left". Your professor will do the same with the code: "make it do this instead".</p>
+        <p>The method never changes. Practise it on the four exercises below, on paper or in the repo, before you open the hints.</p>
+
+        <div class="step-cards">
+          <div class="step-card"><div class="step-num">1</div><div class="step-body"><strong>Name the file and the function that control the behaviour</strong><p>Use Module 2's map. Say it aloud before touching anything.</p></div></div>
+          <div class="step-card"><div class="step-num">2</div><div class="step-body"><strong>Make the smallest change</strong><p>One condition, one line, one <span class="term" data-definition="A thin function that adds nothing but a different way to call another function.">wrapper</span>.</p></div></div>
+          <div class="step-card"><div class="step-num">3</div><div class="step-body"><strong>Rebuild and test in the guest</strong><p><code>./scripts/xv6 build</code>, then <code>./scripts/xv6 run</code>.</p></div></div>
+          <div class="step-card"><div class="step-num">4</div><div class="step-body"><strong>Explain why it works, and what else it affects</strong><p>Then undo practice edits with <code>git checkout -- .</code></p></div></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Exercise 1: add getprot(addr)</h2>
+        <p>Return 1 if the page holding <code>addr</code> is writable, 0 if read-only, -1 if it is not a valid user page. Use system call number 24.</p>
+        <details class="x-details"><summary>Hint</summary><p>Copy the wiring of mprotect: <code>syscall.h</code>, <code>syscall.c</code> (extern and table), <code>usys.S</code>, <code>user.h</code>, <code>defs.h</code>. The helper looks up the entry with <code>walkpgdir(…, 0)</code> and tests <code>PTE_W</code>.</p></details>
+        <details class="x-details"><summary>Answer</summary>
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · video/examples/getprot_solution.c · lines 6-17</span>
+    <pre><code><span class="code-line"><span class="code-keyword">int</span></span>
+<span class="code-line">getuvmprot(pde_t <span class="code-operator">*</span>pgdir, uint sz, uint va)</span>
+<span class="code-line">{</span>
+<span class="code-line">  pte_t <span class="code-operator">*</span>pte;</span>
+<span class="code-line"> </span>
+<span class="code-line">  <span class="code-keyword">if</span>(va <span class="code-operator">&gt;</span><span class="code-operator">=</span> sz)                       <span class="code-comment">// outside the process</span></span>
+<span class="code-line">    <span class="code-keyword">return</span> <span class="code-number">-1</span>;</span>
+<span class="code-line">  pte <span class="code-operator">=</span> walkpgdir(pgdir, (<span class="code-keyword">void</span><span class="code-operator">*</span>)va, <span class="code-number">0</span>);   <span class="code-comment">// 0 = never allocate</span></span>
+<span class="code-line">  <span class="code-keyword">if</span>(pte <span class="code-operator">=</span><span class="code-operator">=</span> <span class="code-number">0</span> <span class="code-operator">|</span><span class="code-operator">|</span> (<span class="code-operator">*</span>pte <span class="code-operator">&amp;</span> PTE_P) <span class="code-operator">=</span><span class="code-operator">=</span> <span class="code-number">0</span> <span class="code-operator">|</span><span class="code-operator">|</span> (<span class="code-operator">*</span>pte <span class="code-operator">&amp;</span> PTE_U) <span class="code-operator">=</span><span class="code-operator">=</span> <span class="code-number">0</span>)</span>
+<span class="code-line">    <span class="code-keyword">return</span> <span class="code-number">-1</span>;                       <span class="code-comment">// missing, not present, or kernel page</span></span>
+<span class="code-line">  <span class="code-keyword">return</span> (<span class="code-operator">*</span>pte <span class="code-operator">&amp;</span> PTE_W) <span class="code-operator">?</span> <span class="code-number">1</span> <span class="code-operator">:</span> <span class="code-number">0</span>;     <span class="code-comment">// test the write bit only</span></span>
+<span class="code-line">}</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">The helper in <code>vm.c</code>. Take the page directory, process size and an address.</p>
+          <p class="tl">A local variable to hold the table entry.</p>
+          <p class="tl">An address outside the process is invalid, so return -1.</p>
+          <p class="tl">Look up the entry without creating anything.</p>
+          <p class="tl">Missing, not present, or not a user page: also -1.</p>
+          <p class="tl">Otherwise answer 1 if the write bit is set and 0 if not.</p>
+    </div>
+  </div>
+</div>
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · video/examples/getprot_solution.c · lines 20-28</span>
+    <pre><code><span class="code-line"><span class="code-keyword">int</span></span>
+<span class="code-line">sys_getprot(<span class="code-keyword">void</span>)</span>
+<span class="code-line">{</span>
+<span class="code-line">  <span class="code-keyword">int</span> addr;</span>
+<span class="code-line"> </span>
+<span class="code-line">  <span class="code-keyword">if</span>(argint(<span class="code-number">0</span>, <span class="code-operator">&amp;</span>addr) <span class="code-operator">&lt;</span> <span class="code-number">0</span>)</span>
+<span class="code-line">    <span class="code-keyword">return</span> <span class="code-number">-1</span>;</span>
+<span class="code-line">  <span class="code-keyword">return</span> getuvmprot(myproc()<span class="code-operator">-</span><span class="code-operator">&gt;</span>pgdir, myproc()<span class="code-operator">-</span><span class="code-operator">&gt;</span>sz, (uint)addr);</span>
+<span class="code-line">}</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">The system call wrapper in <code>sysproc.c</code>.</p>
+          <p class="tl">A variable for the address argument.</p>
+          <p class="tl">Fetch argument 0; if that fails return -1.</p>
+          <p class="tl">Call the helper with the current process page directory and size.</p>
+          <p class="tl">End.</p>
+    </div>
+  </div>
+</div>
+          <p>Real output with all four exercises applied to a <span class="term" data-definition="A throwaway copy of the project used for experiments, so the real repository stays untouched.">scratch copy</span> and run in the guest:</p>
+          <div class="x-term"><div class="x-termbar"><i></i><i></i><i></i>&nbsp;xv6 guest</div><pre>$ modtest
+getprot(p) before          = 1
+mprotect(p, 5000) bytes    = 0
+getprot(p), getprot(p+4096) = 0 0   (both pages protected)
+getprot(0x80000000)        = -1   (kernel address)
+munprotect(p, 1) bytes     = 0
+getprot(p), getprot(p+4096) = 1 0   (only first page restored)
+child now writes the read-only page:
+pid 4 modtest: write to read-only page 0x3000
+pid 4 modtest: trap 14 err 7 on cpu 0 eip 0x112 addr 0x3000--kill proc
+parent still running
+$ </pre></div>
+        </details>
+        <button class="btn" type="button" data-done="ex1">I did this one</button>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Exercise 2: make len a count of bytes</h2>
+        <p><code>mprotect(p, 5000)</code> should protect two pages (round up). Zero and negative lengths are still invalid.</p>
+        <details class="x-details"><summary>Hint</summary><p>Only <code>changeprotection()</code> in <code>sysproc.c</code> changes. Convert bytes to pages before calling the helper, and avoid adding 4095 to a number that might be huge.</p></details>
+        <details class="x-details"><summary>Answer</summary>
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · video/examples/bytes_solution.c · lines 12-18</span>
+    <pre><code><span class="code-line">  <span class="code-keyword">if</span>(argint(<span class="code-number">0</span>, <span class="code-operator">&amp;</span>addr) <span class="code-operator">&lt;</span> <span class="code-number">0</span> <span class="code-operator">|</span><span class="code-operator">|</span> argint(<span class="code-number">1</span>, <span class="code-operator">&amp;</span>len) <span class="code-operator">&lt;</span> <span class="code-number">0</span>)</span>
+<span class="code-line">    <span class="code-keyword">return</span> <span class="code-number">-1</span>;</span>
+<span class="code-line">  <span class="code-keyword">if</span>(len <span class="code-operator">&lt;</span><span class="code-operator">=</span> <span class="code-number">0</span>)                    <span class="code-comment">// still reject zero and negative</span></span>
+<span class="code-line">    <span class="code-keyword">return</span> <span class="code-number">-1</span>;</span>
+<span class="code-line">  len <span class="code-operator">=</span> (len <span class="code-operator">-</span> <span class="code-number">1</span>) <span class="code-operator">/</span> PGSIZE <span class="code-operator">+</span> <span class="code-number">1</span>;   <span class="code-comment">// bytes -&gt; pages, rounded up</span></span>
+<span class="code-line">                                  <span class="code-comment">// (never computes len + 4095, so no overflow)</span></span>
+<span class="code-line">  <span class="code-keyword">return</span> setuvmwrite(curproc<span class="code-operator">-</span><span class="code-operator">&gt;</span>pgdir, curproc<span class="code-operator">-</span><span class="code-operator">&gt;</span>sz, (uint)addr, len, writable);</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">Fetch the two arguments as before.</p>
+          <p class="tl">A length of zero or less is still invalid.</p>
+          <p class="tl">Convert bytes to pages, rounding up: subtract one first, divide, add one.</p>
+          <p class="tl">The validating helper is unchanged. It now receives a page count.</p>
+    </div>
+  </div>
+</div>
+          <p>Which existing tests would now fail? Any that pass a page count such as <code>mprotect(p, 3)</code>: they now mean 3 bytes, which is one page.</p>
+        </details>
+        <button class="btn" type="button" data-done="ex2">I did this one</button>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Exercise 3: a clearer message on a write fault</h2>
+        <p>When a user process writes a read-only page, print <code>pid N name: write to read-only page 0x…</code> before the usual trap line.</p>
+        <details class="x-details"><summary>Hint</summary><p>It goes in <code>trap.c</code>, in the user-space branch of the default case. Test for trap 14 with the error bits present, write and user.</p></details>
+        <details class="x-details"><summary>Answer</summary>
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · video/examples/fault_message_solution.c · lines 7-9</span>
+    <pre><code><span class="code-line">    <span class="code-keyword">if</span>(tf<span class="code-operator">-</span><span class="code-operator">&gt;</span>trapno <span class="code-operator">=</span><span class="code-operator">=</span> T_PGFLT <span class="code-operator">&amp;</span><span class="code-operator">&amp;</span> (tf<span class="code-operator">-</span><span class="code-operator">&gt;</span>err <span class="code-operator">&amp;</span> <span class="code-number">7</span>) <span class="code-operator">=</span><span class="code-operator">=</span> <span class="code-number">7</span>)   <span class="code-comment">// present + write + user</span></span>
+<span class="code-line">      cprintf(<span class="code-string">&quot;</span><span class="code-string">pid %d %s: write to read-only page 0x%x</span><span class="code-string">\n</span><span class="code-string">&quot;</span>,</span>
+<span class="code-line">              myproc()<span class="code-operator">-</span><span class="code-operator">&gt;</span>pid, myproc()<span class="code-operator">-</span><span class="code-operator">&gt;</span>name, PGROUNDDOWN(rcr2()));</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">Only for a page fault whose error code is "present + write + user" (7). Other faults keep the old message only.</p>
+          <p class="tl">Print the process id and name...</p>
+          <p class="tl">...and the page that was written, using <code>rcr2()</code> (the faulting address) rounded down to its page.</p>
+    </div>
+  </div>
+</div>
+          <p>In the real run above, the output is <code>pid 4 modtest: write to read-only page 0x3000</code> followed by the usual trap line, and the parent keeps running.</p>
+        </details>
+        <button class="btn" type="button" data-done="ex3">I did this one</button>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Exercise 4: refuse page 0, and allow at most 16 pages</h2>
+        <details class="x-details"><summary>Hint</summary><p>Both rules belong in the <em>first check</em> of the shared helper, so they apply to both calls. Only a range that starts at address 0 can include page 0.</p></details>
+        <details class="x-details"><summary>Answer</summary>
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · video/examples/limits_solution.c · lines 9-11</span>
+    <pre><code><span class="code-line">  <span class="code-keyword">if</span>(va <span class="code-operator">%</span> PGSIZE <span class="code-operator">!</span><span class="code-operator">=</span> <span class="code-number">0</span> <span class="code-operator">|</span><span class="code-operator">|</span> npages <span class="code-operator">&lt;</span><span class="code-operator">=</span> <span class="code-number">0</span> <span class="code-operator">|</span><span class="code-operator">|</span> npages <span class="code-operator">&gt;</span> <span class="code-number">16</span>      <span class="code-comment">// cap: at most 16 pages</span></span>
+<span class="code-line">     <span class="code-operator">|</span><span class="code-operator">|</span> va <span class="code-operator">=</span><span class="code-operator">=</span> <span class="code-number">0</span> <span class="code-operator">|</span><span class="code-operator">|</span> va <span class="code-operator">&gt;</span><span class="code-operator">=</span> sz)                             <span class="code-comment">// refuse page 0</span></span>
+<span class="code-line">    <span class="code-keyword">return</span> <span class="code-number">-1</span>;</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">Add <code>npages &gt; 16</code> to the rejection test: the cap.</p>
+          <p class="tl">Add <code>va == 0</code>: refuse any range that starts at page 0.</p>
+          <p class="tl">Return -1 as before. Nothing has been touched.</p>
+    </div>
+  </div>
+</div>
+          <p>Tested in the guest: page 0 is refused, 16 pages work, 17 returns -1, and <code>munprotect</code> obeys the same cap.</p>
+          <div class="x-term"><div class="x-termbar"><i></i><i></i><i></i>&nbsp;xv6 guest</div><pre>$ limtest
+mprotect(0, 1)          = -1   (page 0 refused)
+mprotect(p, 16)         = 0   (16 pages allowed)
+mprotect(p, 17)         = -1   (over the cap)
+munprotect(p, 16)       = 0
+munprotect(p, 17)       = -1   (same cap)</pre></div>
+        </details>
+        <button class="btn" type="button" data-done="ex4">I did this one</button>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">✏️</div>
+          <div class="callout-content">
+            <strong class="callout-title">More to practise on paper</strong>
+            <p>Kill the caller instead of returning -1 when read() targets a protected page. Return how many pages changed. For each, say which file, which line, which test.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Viva drill: twelve questions</h2>
+        <p>Say the answer aloud first. Mark "Knew it" only if you hit the key point.</p>
+        <div class="x-dots" id="fc-dots" aria-hidden="true"></div>
+        <div class="x-fc" id="fc"></div>
+        <div class="x-row" style="margin-top:1rem"><button class="btn" type="button" id="fc-shuffle">Shuffle</button><span class="x-stat" id="fc-stat"></span></div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Before you walk in</h2>
+        <div id="pre-list">
+          <label class="x-check"><input type="checkbox"> Charge the laptop and test it on the presentation machine</label>
+          <label class="x-check"><input type="checkbox"> <code>git pull</code> so you have the latest <code>main</code></label>
+          <label class="x-check"><input type="checkbox"> <code>./scripts/xv6 clean</code> then <code>./scripts/xv6 check</code>: three PASS lines</label>
+          <label class="x-check"><input type="checkbox"> Close every other QEMU window: one guest at a time</label>
+          <label class="x-check"><input type="checkbox"> Keep a screen recording of a passing run as a backup</label>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎤</div>
+          <div class="callout-content">
+            <strong class="callout-title">Your opening, 30 seconds</strong>
+            <p>"I added two system calls, <code>mprotect</code> and <code>munprotect</code>. They clear or set one bit, <code>PTE_W</code>, on a range of pages. The hardware enforces it. I validate first, change second, then flush the TLB, and I made the kernel's own writes respect it. Let me show it, and then I can walk through any block."</p>
+          </div>
+        </div>
+
+        <div class="badge-list">
+          <div class="badge-item"><code class="badge-code">Guest hangs</code><span class="badge-desc">Close the other QEMU, then <code>./scripts/xv6 clean</code>.</span></div>
+          <div class="badge-item"><code class="badge-code">vmdemo: not found</code><span class="badge-desc">Old disk image: clean and run again.</span></div>
+          <div class="badge-item"><code class="badge-code">Stuck in QEMU</code><span class="badge-desc">Press Ctrl-A, then X.</span></div>
+          <div class="badge-item"><code class="badge-code">Nothing works</code><span class="badge-desc">Play the backup recording.</span></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Last check</h2>
+        <div class="quiz-container" id="quiz-module7">
+
+          <div class="quiz-question-block" data-correct="b"
+               data-explanation-right="All the rules live in the first check of setuvmwrite (vm.c line 325). One edit there covers both system calls because they share the helper."
+               data-explanation-wrong="Remember where validation lives. The stub, table and handlers only forward the request, so the rule belongs in setuvmwrite, and it automatically applies to both calls.">
+            <h3 class="quiz-question">The examiner says: "Make mprotect refuse any call longer than 16 pages." Where do you edit, and what else does that change?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>In <code>sys_mprotect</code> only. munprotect is unaffected.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>In the first check of <code>setuvmwrite</code>. Both mprotect and munprotect get the cap.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>In <code>usys.S</code>, before the kernel is entered.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="a"
+               data-explanation-right="Any test that passed a page count now means that many bytes, so multi-page tests protect only one page and fail. Knowing what a change breaks is part of owning the code."
+               data-explanation-wrong="After the change, mprotect(p, 3) means 3 bytes, which rounds up to one page. Tests written for page counts would protect less than they expect.">
+            <h3 class="quiz-question">After you switch <code>len</code> to bytes (Exercise 2), which existing tests do you expect to fail, and why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Tests that pass a page count like <code>mprotect(p, 3)</code>: it now means 3 bytes, one page.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>None; bytes and pages are interchangeable.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Only the fork tests.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="c"
+               data-explanation-right="Trap 14 is a page fault, and an error code of 7 means present + write + user. Testing both keeps the new message from appearing for other faults."
+               data-explanation-wrong="A page fault can have other causes. Check for trap 14 and the error bits present, write and user (value 7), or the message would print for unrelated faults.">
+            <h3 class="quiz-question">For Exercise 3, what exactly do you test for in <code>trap.c</code> so the new message prints only for a protected write?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>That the process name is not "init".</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Only that a trap happened.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>That the trap is a page fault (14) and the error code is present + write + user (7).</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module7')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module7')">Try Again</button>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎓</div>
+          <div class="callout-content">
+            <strong class="callout-title">You own it when</strong>
+            <p>you can rewrite <code>setuvmwrite</code> from memory on paper, make any of these four changes unaided, and explain every line. Then rehearse the demo on the machine you will present on.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

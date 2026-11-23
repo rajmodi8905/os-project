@@ -1,0 +1,246 @@
+<section class="module" id="module-6" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">06</span>
+      <h1 class="module-title">The Fire Drill</h1>
+      <p class="module-subtitle">How we know it works: tests that detect a fault, tests we deliberately broke, and a demo you can run in front of anyone</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Do not trust an alarm you have never heard</h2>
+        <p>A building tests its fire alarm by lighting a small, safe fire. If the alarm stays silent, the alarm is broken. A test works the same way: it only means something if you have seen it fail.</p>
+        <p>First, how can a test <em>see</em> that a write was blocked? The child dies, so it cannot report back. The trick is a marker.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-c6-1","label":"The parent test creates a pipe and forks a child. The child sees the same protected page."},
+          {"highlight":"flow-c6-2","label":"A child process now exists, holding the write end of the pipe.","packet":true,"from":"c6-1","to":"c6-2"},
+          {"highlight":"flow-c6-2","label":"The child writes to the protected page. If that succeeds, its very next line writes a marker byte into the pipe."},
+          {"highlight":"flow-c6-4","label":"But the page is protected. The CPU faults and the kernel kills the child before the marker line.","packet":true,"from":"c6-2","to":"c6-4"},
+          {"highlight":"flow-c6-3","label":"As the child dies, its end of the pipe closes. Nothing was ever written.","packet":true,"from":"c6-4","to":"c6-3"},
+          {"highlight":"flow-c6-1","label":"The parent reads the pipe and gets end-of-file: zero bytes. Zero bytes means the write faulted. A W byte would mean the protection failed.","packet":true,"from":"c6-3","to":"c6-1"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-c6-1"><div class="flow-actor-icon">P</div><span>Parent test</span></div>
+            <div class="flow-actor" id="flow-c6-2"><div class="flow-actor-icon">C</div><span>Child</span></div>
+            <div class="flow-actor" id="flow-c6-3"><div class="flow-actor-icon">|</div><span>Pipe</span></div>
+            <div class="flow-actor" id="flow-c6-4"><div class="flow-actor-icon">K</div><span>Kernel</span></div>
+          </div>
+          <div class="flow-packet"></div>
+          <div class="flow-step-label">Click "Next Step" to begin</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The detector, in real code</h2>
+        <p>This is the helper every protected-write test uses. The xv6 <span class="term" data-definition="A one-way channel between processes. Bytes written at one end can be read at the other; end-of-file arrives when all writers are gone.">pipe</span> replaces the exit status that this old xv6 does not provide.</p>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · vmtest.c · lines 53-60</span>
+    <pre><code><span class="code-line">  <span class="code-keyword">if</span>(pid <span class="code-operator">=</span><span class="code-operator">=</span> <span class="code-number">0</span>){</span>
+<span class="code-line">    close(fds[<span class="code-number">0</span>]);</span>
+<span class="code-line">    printf(<span class="code-number">1</span>, <span class="code-string">&quot;</span><span class="code-string">vmtest: child writing 0x%x (a fault is expected if protected)</span><span class="code-string">\n</span><span class="code-string">&quot;</span>,</span>
+<span class="code-line">           (uint)addr);</span>
+<span class="code-line">    <span class="code-operator">*</span>addr <span class="code-operator">=</span> value;</span>
+<span class="code-line">    write(fds[<span class="code-number">1</span>], <span class="code-string">&quot;</span><span class="code-string">W</span><span class="code-string">&quot;</span>, <span class="code-number">1</span>);   <span class="code-comment">// only reached if the write succeeded</span></span>
+<span class="code-line">    exit();</span>
+<span class="code-line">  }</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">We are the child. A fault here kills only us.</p>
+        <p class="tl">Close the read end of the pipe; the child only writes.</p>
+        <p class="tl">Print which address we are about to write, for the log.</p>
+        <p class="tl">The write under test.</p>
+        <p class="tl">The marker. We only get here if the write above succeeded.</p>
+        <p class="tl">Leave normally.</p>
+        <p class="tl">End of the child's code.</p>
+    </div>
+  </div>
+</div>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · vmtest.c · lines 61-67</span>
+    <pre><code><span class="code-line">  close(fds[<span class="code-number">1</span>]);</span>
+<span class="code-line">  n <span class="code-operator">=</span> read(fds[<span class="code-number">0</span>], <span class="code-operator">&amp;</span>marker, <span class="code-number">1</span>);</span>
+<span class="code-line">  close(fds[<span class="code-number">0</span>]);</span>
+<span class="code-line">  wait();</span>
+<span class="code-line">  <span class="code-keyword">if</span>(n <span class="code-operator">=</span><span class="code-operator">=</span> <span class="code-number">0</span>)</span>
+<span class="code-line">    faults<span class="code-operator">+</span><span class="code-operator">+</span>;</span>
+<span class="code-line">  <span class="code-keyword">return</span> n <span class="code-operator">=</span><span class="code-operator">=</span> <span class="code-number">0</span>;</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">Parent: close the write end so end-of-file can arrive.</p>
+        <p class="tl">Read one byte. Zero bytes means the child died before the marker.</p>
+        <p class="tl">(close our read end) then wait for the child to be cleaned up.</p>
+        <p class="tl">If we got zero bytes, the child was stopped...</p>
+        <p class="tl">...so count one more fault. The runner compares this count with the kernel messages later.</p>
+        <p class="tl">Report: 1 means "the write faulted", 0 means "it succeeded".</p>
+    </div>
+  </div>
+</div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">What the suite proves</h2>
+        <p>65 checks in seven groups, written to catch the six rules from Module 1.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-1)"><div class="pattern-icon" style="background: var(--color-actor-1)">1</div><h4 class="pattern-title">basic</h4><p class="pattern-desc">Protect, read, a faulting write, restore, write again.</p></div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)"><div class="pattern-icon" style="background: var(--color-actor-2)">2</div><h4 class="pattern-title">immediate</h4><p class="pattern-desc">The change is instant. This is the test that needs the CR3 reload.</p></div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)"><div class="pattern-icon" style="background: var(--color-actor-3)">3</div><h4 class="pattern-title">repeated</h4><p class="pattern-desc">Calling twice is harmless.</p></div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-4)"><div class="pattern-icon" style="background: var(--color-actor-4)">4</div><h4 class="pattern-title">multiple</h4><p class="pattern-desc">Every page in a range changes; the neighbours do not.</p></div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-5)"><div class="pattern-icon" style="background: var(--color-actor-5)">5</div><h4 class="pattern-title">forking</h4><p class="pattern-desc">The child inherits protection; changes stay independent both ways.</p></div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-1)"><div class="pattern-icon" style="background: var(--color-actor-1)">6</div><h4 class="pattern-title">invalid</h4><p class="pattern-desc">Unaligned, zero, negative, overflow, wrap, past the heap, kernel, guard page: all -1. Mixed ranges change nothing.</p></div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)"><div class="pattern-icon" style="background: var(--color-actor-2)">7</div><h4 class="pattern-title">kernelbuffers</h4><p class="pattern-desc">read, fstat, pipe refuse protected buffers; write still works.</p></div>
+        </div>
+
+        <p>The <em>immediate</em> test is the clever one. It writes first, so the <span class="term" data-definition="The processor that runs instructions. It checks the permission bits on every single memory access.">CPU</span> caches a writable entry. Then it protects the page and writes again with no process switch in between.</p>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">CODE · vmtest.c · lines 101-105</span>
+    <pre><code><span class="code-line">    <span class="code-operator">*</span>addr <span class="code-operator">=</span> <span class="code-string">&#x27;</span><span class="code-string">a</span><span class="code-string">&#x27;</span>;</span>
+<span class="code-line">    <span class="code-keyword">if</span>(mprotect(addr, <span class="code-number">1</span>) <span class="code-operator">=</span><span class="code-operator">=</span> <span class="code-number">0</span>){</span>
+<span class="code-line">      <span class="code-operator">*</span>addr <span class="code-operator">=</span> <span class="code-string">&#x27;</span><span class="code-string">b</span><span class="code-string">&#x27;</span>;           <span class="code-comment">// must fault here</span></span>
+<span class="code-line">      write(fds[<span class="code-number">1</span>], <span class="code-string">&quot;</span><span class="code-string">W</span><span class="code-string">&quot;</span>, <span class="code-number">1</span>);</span>
+<span class="code-line">    }</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">First write: the CPU now caches "this page is writable".</p>
+        <p class="tl">Protect the page. If this returns 0, continue.</p>
+        <p class="tl">The second write. With CR3 reloaded it faults. Without it, the stale cache lets it through.</p>
+        <p class="tl">The marker: seeing it in the pipe means the protection leaked.</p>
+    </div>
+  </div>
+</div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Light the small fire</h2>
+        <p><span class="term" data-definition="Deliberately breaking the code to check that your tests notice. A test that never fails proves nothing.">Break the code on purpose</span> and see which test raises the alarm. The first three were actually run; the fourth is a prediction you can verify yourself.</p>
+
+        <div class="x-sim" id="mut-sim">
+          <p class="x-st">Try it</p><h3>The mutation lab</h3>
+          <div class="x-tabs" role="tablist" id="mut-tabs"></div>
+          <div id="mut-out" aria-live="polite"></div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Our first suite missed a bug</strong>
+            <p>We deleted the CR3 reload and the full suite still passed. Every protected write happened in a freshly forked child. That is why the <em>immediate</em> test exists. Testing your tests is a real engineering step.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The live demo, scene by scene</h2>
+        <p>This replays the real <code>vmdemo 7 3</code> output from the xv6 <span class="term" data-definition="The xv6 system running inside QEMU. It is separate from your real computer.">guest</span>, one scene at a time, with what to say at each step.</p>
+
+        <div class="x-sim" id="demo-sim">
+          <p class="x-st">Try it</p><h3>Replay</h3>
+          <div class="x-row"><button class="btn btn-primary" type="button" id="demo-next">Next scene</button><button class="btn" type="button" id="demo-reset">Restart</button></div>
+          <div class="x-term"><div class="x-termbar"><i></i><i></i><i></i>&nbsp;xv6 guest · QEMU serial console</div><pre id="demo-term" aria-live="polite"></pre></div>
+          <div class="x-verdict" id="demo-say"></div>
+          <script type="application/json" id="guest-data">["vmdemo 7 3", "", "[1] 3 page(s) at 0x4000, writable control", "      stored and read back 7 ... 9", "", "[2] mprotect(0x4000, 3) = 0", "      protected read still works: 7", "pid 4 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x6000--kill proc", "      child write of 107 to 0x6000: STOPPED by page fault (child killed)", "      parent still alive, value unchanged: 9", "", "[3] fork inheritance: a new child inherits the read-only page", "pid 5 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x4000--kill proc", "      inherited child write of 207 to 0x4000: STOPPED by page fault (child killed)", "", "[4] invalid requests are rejected and change nothing", "      mprotect(0x4001, 1)  unaligned       = -1", "      mprotect(0x4000, 0)  zero length     = -1", "      munprotect(0x4000, 4) past heap end = -1", "pid 6 vmdemo: trap 14 err 7 on cpu 0 eip 0x2ed addr 0x4000--kill proc", "      child (after rejected munprotect) write of 307 to 0x4000: STOPPED by page fault (child killed)", "", "[5] munprotect(0x4000, 3) = 0", "      parent wrote and read back 407", "      child write of 507 to 0x4000: SUCCEEDED", "", "vmdemo done; the shell is still running.", "$ vmtest", "vmtest: ok   allocate an aligned page", "vmtest: ok   writable control store/load", "vmtest: ok   mprotect one page returns 0", "vmtest: ok   protected page is still readable", "vmtest: child writing 0x5000 (a fault is expected if protected)", "pid 9 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0x5000--kill proc", "vmtest: ok   write to protected page faults in child", "vmtest: ok   parent value unchanged after child fault", "vmtest: ok   munprotect one page returns 0", "vmtest: ok   write after munprotect succeeds", "vmtest: child writing 0x5000 (a fault is expected if protected)", "vmtest: ok   child write to unprotected page succeeds", "pid 11 vmtest: trap 14 err 7 on cpu 0 eip 0xaec addr 0x6000--kill proc", "vmtest: ok   mprotect takes effect immediately (TLB refreshed)", "vmtest: ok   mprotect twice returns 0", "vmtest: child writing 0x7000 (a fault is expected if protected)", "pid 12 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0x7000--kill proc", "vmtest: ok   still protected after repeated mprotect", "vmtest: ok   munprotect twice returns 0", "vmtest: child writing 0x7000 (a fault is expected if protected)", "vmtest: ok   writable after repeated munprotect", "vmtest: ok   parent write after repeated munprotect", "vmtest: ok   mprotect three pages returns 0", "vmtest: child writing 0x9064 (a fault is expected if protected)", "pid 14 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0x9064--kill proc", "vmtest: child writing 0xA064 (a fault is expected if protected)", "pid 15 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xa064--kill proc", "vmtest: child writing 0xB064 (a fault is expected if protected)", "pid 16 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xb064--kill proc", "vmtest: ok   every page in the range is protected", "vmtest: child writing 0x8000 (a fault is expected if protected)", "vmtest: ok   page before the range still writable", "vmtest: child writing 0xC000 (a fault is expected if protected)", "vmtest: ok   page after the range still writable", "vmtest: ok   protected pages still readable", "vmtest: ok   munprotect three pages returns 0", "vmtest: ok   all three pages writable again", "vmtest: ok   protect page before fork", "vmtest: child writing 0xD000 (a fault is expected if protected)", "pid 19 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xd000--kill proc", "vmtest: ok   fork child inherits protection", "vmtest: ok   child can munprotect and write its copy", "vmtest: ok   parent copy not changed by child", "vmtest: child writing 0xD000 (a fault is expected if protected)", "pid 21 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xd000--kill proc", "vmtest: ok   parent page still protected after child munprotect", "vmtest: ok   parent munprotects", "vmtest: ok   parent writable after child mprotect", "vmtest: ok   unaligned address rejected", "vmtest: ok   unaligned munprotect rejected", "vmtest: ok   zero length rejected", "vmtest: ok   negative length rejected", "vmtest: ok   overflowing length rejected", "vmtest: ok   wrapping address rejected", "vmtest: ok   page past the heap end rejected", "vmtest: ok   kernel address rejected", "vmtest: ok   kernel munprotect rejected", "vmtest: ok   stack guard page rejected", "vmtest: ok   stack guard page munprotect rejected", "vmtest: ok   range running past the heap end rejected", "vmtest: child writing 0xE000 (a fault is expected if protected)", "vmtest: child writing 0xF000 (a fault is expected if protected)", "vmtest: ok   earlier pages left writable after rejected range", "vmtest: ok   range ending in the guard page rejected", "vmtest: child writing 0x2000 (a fault is expected if protected)", "vmtest: ok   page before the guard left writable after rejected range", "vmtest: ok   munprotect range past the heap end rejected", "vmtest: child writing 0xE000 (a fault is expected if protected)", "pid 26 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xe000--kill proc", "vmtest: child writing 0xF000 (a fault is expected if protected)", "pid 27 vmtest: trap 14 err 7 on cpu 0 eip 0xc07 addr 0xf000--kill proc", "vmtest: ok   earlier pages left protected after rejected munprotect", "vmtest: ok   valid range still works afterwards", "vmtest: ok   allocate two aligned pages", "vmtest: ok   protect first page for kernel-buffer tests", "vmtest: ok   create pipe", "vmtest: ok   fill pipe", "vmtest: ok   read() into protected page rejected", "vmtest: ok   protected page not modified by read()", "vmtest: ok   switch protection to second page", "vmtest: ok   read() spanning writable then protected page rejected", "vmtest: ok   neither page modified", "vmtest: ok   read() into writable page still works", "vmtest: ok   protect first page again", "vmtest: protected bytes via write(): xy", "vmtest: ok   write() from protected page allowed", "vmtest: ok   open vmtest for fstat", "vmtest: ok   fstat() into protected page rejected", "vmtest: ok   fstat() into writable buffer works", "vmtest: ok   pipe() into protected page rejected", "vmtest: ok   protected page unchanged", "vmtest: ok   unprotect both pages", "vmtest: 10 child write faults observed", "vmtest: ALL PASSED", "$ echo SHELL_STILL_ALIVE", "SHELL_STILL_ALIVE", "$ "]</script>
+        </div>
+
+        <div class="x-term"><div class="x-termbar"><i></i><i></i><i></i>&nbsp;the commands you will type</div><pre><span class="x-cmd">$ ./scripts/xv6 run</span>      # boots xv6; leave with Ctrl-A, then X
+<span class="x-cmd">$ vmdemo</span>                   # default: value 42, 2 pages
+<span class="x-cmd">$ vmdemo 1000 4</span>             # the examiner picks value and pages (1 to 16)
+<span class="x-cmd">$ vmtest</span>                   # all checks; ends with ALL PASSED
+<span class="x-cmd">$ echo still alive</span>         # the shell survived every faulting child</pre></div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The evidence</h2>
+        <p>The full check passes in three places. Each run starts from a clean disk image.</p>
+
+<div class="translation-block animate-in">
+  <div class="translation-code">
+    <span class="translation-label">REAL OUTPUT · check_output.txt · lines 1-3</span>
+    <pre><code><span class="code-line">PASS: xv6 boot, shell command and upstream forktest</span>
+<span class="code-line">PASS: vmtest page protection (10 expected user write faults, shell still alive)</span>
+<span class="code-line">PASS: upstream usertests</span></code></pre>
+  </div>
+  <div class="translation-english">
+    <span class="translation-label">PLAIN ENGLISH</span>
+    <div class="translation-lines">
+<p class="tl">The system boots, the shell works, and the original xv6 fork test still passes.</p>
+        <p class="tl">Our suite ran. 10 children faulted on purpose, and the runner confirmed the kernel printed exactly 10 matching fault lines.</p>
+        <p class="tl">The original xv6 test suite, untouched, still passes: we broke nothing.</p>
+    </div>
+  </div>
+</div>
+
+        <div class="badge-list">
+          <div class="badge-item"><code class="badge-code">Linux container</code><span class="badge-desc">Ubuntu, clean build: all three lines pass</span></div>
+          <div class="badge-item"><code class="badge-code">GitHub Actions</code><span class="badge-desc">The <span class="term" data-definition="Continuous integration: a service (GitHub Actions here) that builds and tests the project automatically on every push.">CI</span> workflow runs the same check on every push</span></div>
+          <div class="badge-item"><code class="badge-code">Pop!_OS laptop</code><span class="badge-desc">A fresh clone: all three lines pass</span></div>
+          <div class="badge-item"><code class="badge-code">macOS</code><span class="badge-desc">Passed the baseline only so far. Run check there once before relying on it.</span></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <div class="quiz-container" id="quiz-module6">
+
+          <div class="quiz-question-block" data-correct="b"
+               data-explanation-right="Deliberately breaking the code and watching the test fail proves the test can detect the bug. A test that has never failed has never proved anything."
+               data-explanation-wrong="A passing test only shows it passes on correct code. To know it can catch a mistake, introduce the mistake and confirm the test notices.">
+            <h3 class="quiz-question">You add a new test for the TLB reload and it passes. How do you gain confidence it can actually fail?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Run it several more times.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Delete the <code>lcr3</code> line on purpose and confirm the test now fails.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Read the test code carefully.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="c"
+               data-explanation-right="This old xv6 wait() returns no exit status, so the test needs another signal. The marker byte through a pipe gives one: no byte means the child died first."
+               data-explanation-wrong="Check what this xv6 wait() returns. It reports no exit status, so the parent cannot learn how the child ended. A byte (or the lack of one) through a pipe carries that information instead.">
+            <h3 class="quiz-question">A teammate suggests using the exit status from <code>wait()</code> to learn whether the child died from a fault. Why does the project use a pipe instead?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Pipes are faster than wait().</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>wait() is unsafe after a fault.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>This xv6 version gives wait() no exit status, so a marker through a pipe is the only signal available.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-correct="a"
+               data-explanation-right="The runner cross-checks the test's own count against the kernel's messages. A mismatch means something faulted that the test did not expect, or a test passed for the wrong reason, which is exactly what the cross-check is for."
+               data-explanation-wrong="Do not ignore a mismatch. The test counted 9 expected faults but the kernel printed 10. One child died unexpectedly, or a count is wrong. Treat it as a failure and investigate.">
+            <h3 class="quiz-question">The runner reports that <code>vmtest</code> counted 9 faulting children, but the kernel printed 10 lines of <code>trap 14 err 7</code>. What does that tell you?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Something faulted that the test did not expect (or a count is wrong). Investigate; do not accept the pass.</span></button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It is fine: the kernel always prints one extra line.</span></button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The tests are too slow.</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module6')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module6')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
